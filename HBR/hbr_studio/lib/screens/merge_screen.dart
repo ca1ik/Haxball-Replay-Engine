@@ -551,10 +551,9 @@ class _MergeScreenState extends State<MergeScreen> {
     children: [
       const SectionLabel('Output Log'),
       const SizedBox(height: 8),
-      GlassCard(
-        padding: const EdgeInsets.all(16),
-        child: SizedBox(
-          height: 300,
+      Expanded(
+        child: GlassCard(
+          padding: const EdgeInsets.all(16),
           child: _logLines.isEmpty
               ? _buildIdleInfo()
               : ListView.builder(
@@ -564,7 +563,7 @@ class _MergeScreenState extends State<MergeScreen> {
                     child: Text(
                       _logLines[i],
                       style: GoogleFonts.robotoMono(
-                        fontSize: 11,
+                        fontSize: 13,
                         color: AppTheme.textSec,
                       ),
                     ),
@@ -634,7 +633,7 @@ class _MergeScreenState extends State<MergeScreen> {
                   Text(
                     item.$3,
                     style: GoogleFonts.inter(
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textPrimOf(context),
                       decoration: TextDecoration.none,
@@ -644,7 +643,7 @@ class _MergeScreenState extends State<MergeScreen> {
                   Text(
                     item.$4,
                     style: GoogleFonts.inter(
-                      fontSize: 10,
+                      fontSize: 12,
                       color: AppTheme.textSecOf(context),
                       height: 1.45,
                       decoration: TextDecoration.none,

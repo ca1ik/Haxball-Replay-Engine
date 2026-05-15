@@ -39,6 +39,7 @@ class _SplitScreenState extends State<SplitScreen> {
   Map<String, dynamic>? _fileInfo;
   bool _probing = false;
   bool _dragging = false;
+  bool _dropHover = false;
   bool _running = false;
 
   // Trim time controllers — START
@@ -321,28 +322,52 @@ class _SplitScreenState extends State<SplitScreen> {
     },
     onDragEntered: (_) => setState(() => _dragging = true),
     onDragExited: (_) => setState(() => _dragging = false),
-    child: GestureDetector(
-      onTap: _running ? null : _pickInput,
-      child: AnimatedContainer(
+    child: MouseRegion(
+      onEnter: (_) => setState(() => _dropHover = true),
+      onExit: (_) => setState(() => _dropHover = false),
+      child: AnimatedScale(
+        scale: _dropHover ? 1.025 : 1.0,
         duration: const Duration(milliseconds: 200),
-        height: 130,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: _dragging
-              ? AppTheme.purple.withOpacity(0.06)
-              : (_inputPath != null
-                    ? AppTheme.surfaceOf(context)
-                    : AppTheme.surfaceOf(context)),
-          border: Border.all(
-            color: _dragging
-                ? AppTheme.purple
-                : (_inputPath != null
-                      ? AppTheme.purple.withOpacity(0.4)
-                      : AppTheme.borderOf(context)),
-            width: _dragging ? 2 : (_inputPath != null ? 1.5 : 1),
-          ),
-        ),
-        child: Center(
+        child: GestureDetector(
+          onTap: _running ? null : _pickInput,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: 130,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: _dragging
+                  ? AppTheme.purple.withOpacity(0.06)
+                  : (_inputPath != null
+                        ? AppTheme.surfaceOf(context)
+                        : AppTheme.surfaceOf(context)),
+              border: Border.all(
+                color: _dragging
+                    ? AppTheme.purple
+                    : (_dropHover
+                          ? AppTheme.purple.withOpacity(0.7)
+                          : (_inputPath != null
+                                ? AppTheme.purple.withOpacity(0.4)
+                                : AppTheme.borderOf(context))),
+                width: _dragging
+                    ? 2
+                    : (_dropHover ? 1.8 : (_inputPath != null ? 1.5 : 1)),
+              ),
+              boxShadow: _dropHover
+                  ? [
+                      BoxShadow(
+                        color: AppTheme.purple.withOpacity(0.30),
+                        blurRadius: 18,
+                        spreadRadius: 2,
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFF4A6CF7).withOpacity(0.18),
+                        blurRadius: 30,
+                        spreadRadius: 0,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Center(
           child: _inputPath != null
               ? _probing
                     ? const CircularProgressIndicator(
@@ -409,6 +434,8 @@ class _SplitScreenState extends State<SplitScreen> {
                     ),
                   ],
                 ),
+        ),
+          ),
         ),
       ),
     ),
@@ -816,10 +843,9 @@ class _SplitScreenState extends State<SplitScreen> {
     children: [
       const SectionLabel('Output Log'),
       const SizedBox(height: 8),
-      GlassCard(
-        padding: const EdgeInsets.all(16),
-        child: SizedBox(
-          height: 260,
+      Expanded(
+        child: GlassCard(
+          padding: const EdgeInsets.all(16),
           child: _logLines.isEmpty
               ? _buildIdleInfo()
               : ListView.builder(
@@ -829,7 +855,7 @@ class _SplitScreenState extends State<SplitScreen> {
                     child: Text(
                       _logLines[i],
                       style: GoogleFonts.robotoMono(
-                        fontSize: 11,
+                        fontSize: 13,
                         color: AppTheme.textSec,
                       ),
                     ),
@@ -975,7 +1001,7 @@ class _SplitScreenState extends State<SplitScreen> {
                   Text(
                     item.$3,
                     style: GoogleFonts.inter(
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textPrimOf(context),
                       decoration: TextDecoration.none,
@@ -985,7 +1011,7 @@ class _SplitScreenState extends State<SplitScreen> {
                   Text(
                     item.$4,
                     style: GoogleFonts.inter(
-                      fontSize: 10,
+                      fontSize: 12,
                       color: AppTheme.textSecOf(context),
                       height: 1.45,
                       decoration: TextDecoration.none,

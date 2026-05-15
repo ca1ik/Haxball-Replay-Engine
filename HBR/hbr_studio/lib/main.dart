@@ -85,7 +85,7 @@ class HbrStudioApp extends StatelessWidget {
 }
 
 // ── Navigation Items ──────────────────────────────────────────────────────────
-enum NavItem { merge, split, analyze, howItWorks, about, settings }
+enum NavItem { analyze, merge, split, howItWorks, about, settings }
 
 extension NavItemX on NavItem {
   String label(AppL10n l10n) => switch (this) {
@@ -122,7 +122,7 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  NavItem _current = NavItem.merge;
+  NavItem _current = NavItem.analyze;
 
   @override
   Widget build(BuildContext context) {
@@ -394,9 +394,9 @@ class _Sidebar extends StatelessWidget {
   const _Sidebar({required this.current, required this.onSelect});
 
   static const _main = [
+    NavItem.analyze,
     NavItem.merge,
     NavItem.split,
-    NavItem.analyze,
     NavItem.howItWorks,
   ];
   static const _bottom = [NavItem.about];
@@ -647,10 +647,10 @@ class _NavBtnState extends State<_NavBtn> with TickerProviderStateMixin {
                       Text(
                         widget.item.label(l10n),
                         style: GoogleFonts.inter(
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: active
                               ? FontWeight.w700
-                              : FontWeight.w500,
+                              : FontWeight.w600,
                           color: _isAbout ? const Color(0xFF7B5EA7) : iconColor,
                           decoration: TextDecoration.none,
                         ),

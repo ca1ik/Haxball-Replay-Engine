@@ -5,6 +5,7 @@
 // independently from the rest of the widget tree.
 
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
@@ -37,6 +38,11 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
     vsync: this,
     duration: const Duration(seconds: 10),
   )..repeat(reverse: true);
+  // Slow pulsing balls layer
+  late final AnimationController _cBalls = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 5),
+  )..repeat();
 
   @override
   void dispose() {
@@ -44,6 +50,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
     _c2.dispose();
     _c3.dispose();
     _cBg.dispose();
+    _cBalls.dispose();
     super.dispose();
   }
 
@@ -70,7 +77,16 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
             ),
           ),
         ),
-        // ── Layer 4: Content ──────────────────────────────────────────────────
+        // ── Layer 4: Pulsing small balls ─────────────────────────────────────
+        RepaintBoundary(
+          child: AnimatedBuilder(
+            animation: _cBalls,
+            builder: (_, __) => CustomPaint(
+              painter: _BallsPainter(t: _cBalls.value),
+            ),
+          ),
+        ),
+        // ── Layer 5: Content ──────────────────────────────────────────
         widget.child,
       ],
     );
@@ -312,4 +328,37 @@ class _OrbPainter extends CustomPainter {
   @override
   bool shouldRepaint(_OrbPainter old) =>
       old.t1 != t1 || old.t2 != t2 || old.t3 != t3 || old.isDark != isDark;
+}
+
+// ── Pulsing small balls ──────────────────────────────────────────────────
+class _BallsPainter extends CustomPainter {
+  final double t;
+  const _BallsPainter({required this.t});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const balls = [
+      (0.12, 0.22, 4.0, 9.0, 0.00, Color(0xFF7B5EA7)),
+      (0.82, 0.18, 3.0, 8.0, 0.33, Color(0xFF4A6CF7)),
+      (0.25, 0.72, 5.0, 11.0, 0.60, Color(0xFF7B5EA7)),
+      (0.68, 0.60, 4.0, 9.0, 0.15, Color(0xFF4A6CF7)),
+      (0.50, 0.38, 3.0, 7.0, 0.75, Color(0xFF00C9FF)),
+      (0.88, 0.52, 4.0, 8.0, 0.45, Color(0xFF7B5EA7)),
+      (0.40, 0.10, 3.0, 7.0, 0.80, Color(0xFF4A6CF7)),
+    ];
+    for (final (rx, ry, minR, maxR, phase, color) in balls) {
+      final pulse = math.sin((t + phase) * math.pi * 2) * 0.5 + 0.5;
+      final radius = minR + (maxR - minR) * pulse;
+      final cx = size.width * rx;
+      final cy = size.height * ry;
+      final paint = Paint()
+        ..shader = RadialGradient(
+          colors: [color.withOpacity(0.45), color.withOpacity(0)],
+        ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: radius));
+      canvas.drawCircle(Offset(cx, cy), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BallsPainter old) => old.t != t;
 }

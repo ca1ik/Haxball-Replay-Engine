@@ -349,12 +349,12 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SectionLabel('Split Flow Diagram'),
-        const SizedBox(height: 16),
-        Center(child: _buildPlayButton()),
         const SizedBox(height: 20),
-        _SplitDiagram(controller: _flowCtrl),
+        ClipRect(child: _SplitDiagram(controller: _flowCtrl)),
         const SizedBox(height: 24),
         _buildSplitTimeline(),
+        const SizedBox(height: 16),
+        Center(child: _buildPlayButton()),
       ],
     ),
   );
@@ -809,16 +809,18 @@ class _MergePainter extends CustomPainter {
     final f2x = progress < 0.3
         ? w + (f2xFinal - w) * (progress / 0.3)
         : f2xFinal;
-    _drawFileBox(
-      canvas,
-      f2x,
-      midY - fileH / 2,
-      fileW,
-      fileH,
-      AppTheme.purple,
-      '2nd Half',
-      '41,645 fr',
-    );
+    if (f2x < w) {
+      _drawFileBox(
+        canvas,
+        f2x,
+        midY - fileH / 2,
+        fileW,
+        fileH,
+        AppTheme.purple,
+        '2nd Half',
+        '41,645 fr',
+      );
+    }
 
     // ── Connecting arrows (appear after files arrive)
     if (progress > 0.3) {
@@ -1043,16 +1045,18 @@ class _SplitPainter extends CustomPainter {
     final srcY = progress < 0.25
         ? -fileH + (h * 0.08 + fileH) * (progress / 0.25)
         : h * 0.08;
-    _drawFileBox(
-      canvas,
-      w / 2 - fileW / 2,
-      srcY,
-      fileW,
-      fileH,
-      Colors.white54,
-      'input.hbr2',
-      '86,411 frames',
-    );
+    if (srcY + fileH > 0) {
+      _drawFileBox(
+        canvas,
+        w / 2 - fileW / 2,
+        srcY,
+        fileW,
+        fileH,
+        Colors.white54,
+        'input.hbr2',
+        '86,411 frames',
+      );
+    }
 
     // ── Timeline bar
     if (progress > 0.25) {
