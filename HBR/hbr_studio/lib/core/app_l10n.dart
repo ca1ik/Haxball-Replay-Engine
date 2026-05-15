@@ -84,7 +84,7 @@ class AppL10n {
     'settings.fps': 'High refresh rate (360Hz)',
 
     // AI Chat
-    'ai.title': 'HaxReplay AI',
+    'ai.title': 'HaxReplay Assistant',
     'ai.placeholder': 'Ask about your replay, request merge/split...',
     'ai.clear': 'Clear chat',
     'ai.copy': 'Copy',
