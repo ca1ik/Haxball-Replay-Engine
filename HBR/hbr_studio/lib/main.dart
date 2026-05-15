@@ -1,12 +1,20 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'core/app_l10n.dart';
+import 'providers/replay_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/about_screen.dart';
+import 'screens/analyzer_screen.dart';
 import 'screens/how_it_works_screen.dart';
 import 'screens/merge_screen.dart';
+import 'screens/settings_screen.dart';
 import 'screens/split_screen.dart';
 import 'theme/app_theme.dart';
+import 'widgets/ai_chat_widget.dart';
 import 'widgets/animated_background.dart';
 import 'widgets/shared_widgets.dart';
 
@@ -15,8 +23,8 @@ void main() async {
   await windowManager.ensureInitialized();
 
   const options = WindowOptions(
-    size: Size(1280, 780),
-    minimumSize: Size(1000, 640),
+    size: Size(1340, 820),
+    minimumSize: Size(1060, 680),
     center: true,
     backgroundColor: Colors.transparent,
     titleBarStyle: TitleBarStyle.hidden,
@@ -29,42 +37,62 @@ void main() async {
     await windowManager.focus();
   });
 
-  runApp(const HbrStudioApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => ReplayProvider()),
+      ],
+      child: const HbrStudioApp(),
+    ),
+  );
 }
 
+// ── App Root ──────────────────────────────────────────────────────────────────
 class HbrStudioApp extends StatelessWidget {
   const HbrStudioApp({super.key});
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'HBR Studio',
-    debugShowCheckedModeBanner: false,
-    theme: AppTheme.theme,
-    home: const AppShell(),
-  );
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    return MaterialApp(
+      title: 'HBR Studio',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: settings.themeMode,
+      home: const AppShell(),
+    );
+  }
 }
 
-// ── Navigation ────────────────────────────────────────────────────────────────
-enum NavItem { merge, split, howItWorks, about }
+// ── Navigation Items ──────────────────────────────────────────────────────────
+enum NavItem { merge, split, analyze, howItWorks, about, settings }
 
 extension NavItemX on NavItem {
-  String get label => switch (this) {
-    NavItem.merge => 'Merge',
-    NavItem.split => 'Split',
-    NavItem.howItWorks => 'Guide',
-    NavItem.about => 'About',
+  String label(AppL10n l10n) => switch (this) {
+    NavItem.merge => l10n.t('nav.merge'),
+    NavItem.split => l10n.t('nav.split'),
+    NavItem.analyze => l10n.t('nav.analyze'),
+    NavItem.howItWorks => l10n.t('nav.guide'),
+    NavItem.about => l10n.t('nav.about'),
+    NavItem.settings => l10n.t('nav.settings'),
   };
   IconData get icon => switch (this) {
     NavItem.merge => Icons.merge_type_rounded,
     NavItem.split => Icons.content_cut_rounded,
+    NavItem.analyze => Icons.bar_chart_rounded,
     NavItem.howItWorks => Icons.play_circle_outline_rounded,
     NavItem.about => Icons.info_outline_rounded,
+    NavItem.settings => Icons.settings_rounded,
   };
   Color get color => switch (this) {
     NavItem.merge => AppTheme.accent,
     NavItem.split => AppTheme.purple,
+    NavItem.analyze => const Color(0xFF4A6CF7),
     NavItem.howItWorks => const Color(0xFFFF8C42),
-    NavItem.about => const Color(0xFF4A6CF7),
+    NavItem.about => const Color(0xFF4A9EFF),
+    NavItem.settings => const Color(0xFF7B5EA7),
   };
 }
 
@@ -81,50 +109,59 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     return AnimatedBackground(
-      child: Column(
+      child: Stack(
         children: [
-          // ── Custom Title Bar ───────────────────────────────────────────────
-          _TitleBar(current: _current),
-          // ── Body ───────────────────────────────────────────────────────────
-          Expanded(
-            child: Row(
-              children: [
-                _Sidebar(
-                  current: _current,
-                  onSelect: (n) => setState(() => _current = n),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(28, 20, 28, 24),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 280),
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder: (child, anim) => FadeTransition(
-                        opacity: anim,
-                        child: SlideTransition(
-                          position: Tween(
-                            begin: const Offset(0.02, 0),
-                            end: Offset.zero,
-                          ).animate(anim),
-                          child: child,
+          Column(
+            children: [
+              _TitleBar(
+                current: _current,
+                onSettings: () => setState(() => _current = NavItem.settings),
+              ),
+              Expanded(
+                child: Row(
+                  children: [
+                    _Sidebar(
+                      current: _current,
+                      onSelect: (n) => setState(() => _current = n),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(28, 20, 28, 24),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 280),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (child, anim) => FadeTransition(
+                            opacity: anim,
+                            child: SlideTransition(
+                              position: Tween(
+                                begin: const Offset(0.02, 0),
+                                end: Offset.zero,
+                              ).animate(anim),
+                              child: child,
+                            ),
+                          ),
+                          child: KeyedSubtree(
+                            key: ValueKey(_current),
+                            child: switch (_current) {
+                              NavItem.merge => const MergeScreen(),
+                              NavItem.split => const SplitScreen(),
+                              NavItem.analyze => const AnalyzerScreen(),
+                              NavItem.howItWorks => const HowItWorksScreen(),
+                              NavItem.about => const AboutScreen(),
+                              NavItem.settings => const SettingsScreen(),
+                            },
+                          ),
                         ),
                       ),
-                      child: KeyedSubtree(
-                        key: ValueKey(_current),
-                        child: switch (_current) {
-                          NavItem.merge => const MergeScreen(),
-                          NavItem.split => const SplitScreen(),
-                          NavItem.howItWorks => const HowItWorksScreen(),
-                          NavItem.about => const AboutScreen(),
-                        },
-                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+          // ── Floating AI Chat ─────────────────────────────────────────────────
+          const Positioned.fill(child: AiChatWidget()),
         ],
       ),
     );
@@ -134,27 +171,26 @@ class _AppShellState extends State<AppShell> {
 // ── Custom Title Bar ──────────────────────────────────────────────────────────
 class _TitleBar extends StatelessWidget {
   final NavItem current;
-  const _TitleBar({required this.current});
+  final VoidCallback onSettings;
+  const _TitleBar({required this.current, required this.onSettings});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context.watch<SettingsProvider>().lang);
     return DragToMoveArea(
       child: Container(
         height: 50,
         decoration: BoxDecoration(
-          // Seamlessly blends with the app — no chrome border, same color
-          color: AppTheme.surface.withOpacity(0.85),
+          color: AppTheme.surfaceOf(context).withOpacity(0.85),
           border: Border(
             bottom: BorderSide(
-              color: AppTheme.border.withOpacity(0.6),
-              width: 1,
+              color: AppTheme.borderOf(context).withOpacity(0.6),
             ),
           ),
         ),
         child: Row(
           children: [
             const SizedBox(width: 16),
-            // Logo + name
             Container(
               width: 28,
               height: 28,
@@ -180,27 +216,38 @@ class _TitleBar extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textPrim,
+                color: AppTheme.textPrimOf(context),
                 letterSpacing: -0.2,
+                decoration: TextDecoration.none,
               ),
             ),
             const SizedBox(width: 8),
-            Container(width: 1, height: 14, color: AppTheme.border),
+            Container(width: 1, height: 14, color: AppTheme.borderOf(context)),
             const SizedBox(width: 8),
             Text(
-              current.label,
-              style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textHint),
+              current.label(l10n),
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: AppTheme.textHintOf(context),
+                decoration: TextDecoration.none,
+              ),
             ),
             const Spacer(),
-            // Live indicator
             const GlowDot(),
             const SizedBox(width: 6),
             Text(
               'Ready',
-              style: GoogleFonts.inter(fontSize: 10, color: AppTheme.textHint),
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                color: AppTheme.textHintOf(context),
+                decoration: TextDecoration.none,
+              ),
             ),
-            const SizedBox(width: 20),
-            // Window controls (macOS-style, positioned on right for Windows)
+            const SizedBox(width: 12),
+            _SettingsBtn(onTap: onSettings),
+            const SizedBox(width: 8),
+            _ThemeToggleBtn(),
+            const SizedBox(width: 16),
             _WinBtn(
               color: const Color(0xFFFFBD44),
               icon: Icons.remove_rounded,
@@ -211,11 +258,10 @@ class _TitleBar extends StatelessWidget {
               color: const Color(0xFF00CA4E),
               icon: Icons.crop_square_rounded,
               onTap: () async {
-                if (await windowManager.isMaximized()) {
+                if (await windowManager.isMaximized())
                   windowManager.unmaximize();
-                } else {
+                else
                   windowManager.maximize();
-                }
               },
             ),
             const SizedBox(width: 6),
@@ -226,6 +272,61 @@ class _TitleBar extends StatelessWidget {
             ),
             const SizedBox(width: 16),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsBtn extends StatefulWidget {
+  final VoidCallback onTap;
+  const _SettingsBtn({required this.onTap});
+  @override
+  State<_SettingsBtn> createState() => _SettingsBtnState();
+}
+
+class _SettingsBtnState extends State<_SettingsBtn> {
+  bool _hov = false;
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    onEnter: (_) => setState(() => _hov = true),
+    onExit: (_) => setState(() => _hov = false),
+    child: GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: _hov
+              ? AppTheme.borderOf(context).withOpacity(0.5)
+              : Colors.transparent,
+        ),
+        child: Icon(
+          Icons.settings_rounded,
+          size: 16,
+          color: _hov
+              ? AppTheme.textPrimOf(context)
+              : AppTheme.textHintOf(context),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ThemeToggleBtn extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    return GestureDetector(
+      onTap: () =>
+          settings.setTheme(settings.isDark ? ThemeMode.light : ThemeMode.dark),
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        child: Icon(
+          settings.isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+          size: 16,
+          color: AppTheme.textHintOf(context),
         ),
       ),
     );
@@ -274,19 +375,27 @@ class _Sidebar extends StatelessWidget {
   final ValueChanged<NavItem> onSelect;
   const _Sidebar({required this.current, required this.onSelect});
 
+  static const _main = [
+    NavItem.merge,
+    NavItem.split,
+    NavItem.analyze,
+    NavItem.howItWorks,
+  ];
+  static const _bottom = [NavItem.about];
+
   @override
   Widget build(BuildContext context) => Container(
     width: 76,
     decoration: BoxDecoration(
-      color: AppTheme.surface.withOpacity(0.7),
+      color: AppTheme.surfaceOf(context).withOpacity(0.7),
       border: Border(
-        right: BorderSide(color: AppTheme.border.withOpacity(0.5)),
+        right: BorderSide(color: AppTheme.borderOf(context).withOpacity(0.5)),
       ),
     ),
     child: Column(
       children: [
         const SizedBox(height: 16),
-        ...NavItem.values.map(
+        ..._main.map(
           (item) => _NavBtn(
             item: item,
             isActive: current == item,
@@ -294,15 +403,30 @@ class _Sidebar extends StatelessWidget {
           ),
         ),
         const Spacer(),
+        ..._bottom.map(
+          (item) => _NavBtn(
+            item: item,
+            isActive: current == item,
+            onTap: () => onSelect(item),
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.only(bottom: 14),
           child: Column(
             children: [
-              Container(width: 28, height: 1, color: AppTheme.border),
+              Container(
+                width: 28,
+                height: 1,
+                color: AppTheme.borderOf(context),
+              ),
               const SizedBox(height: 8),
               Text(
                 'v1.0',
-                style: GoogleFonts.inter(fontSize: 8, color: AppTheme.textHint),
+                style: GoogleFonts.inter(
+                  fontSize: 8,
+                  color: AppTheme.textHintOf(context),
+                  decoration: TextDecoration.none,
+                ),
               ),
             ],
           ),
@@ -332,9 +456,12 @@ class _NavBtnState extends State<_NavBtn> {
   Widget build(BuildContext context) {
     final active = widget.isActive;
     final c = widget.item.color;
+    final l10n = AppL10n.of(context.read<SettingsProvider>().lang);
     final iconColor = active
         ? c
-        : (_hovered ? AppTheme.textSec : AppTheme.textHint);
+        : (_hovered
+              ? AppTheme.textSecOf(context)
+              : AppTheme.textHintOf(context));
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -342,7 +469,7 @@ class _NavBtnState extends State<_NavBtn> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: Tooltip(
-          message: widget.item.label,
+          message: widget.item.label(l10n),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -353,32 +480,30 @@ class _NavBtnState extends State<_NavBtn> {
               color: active
                   ? c.withOpacity(0.12)
                   : (_hovered
-                        ? AppTheme.border.withOpacity(0.4)
+                        ? AppTheme.borderOf(context).withOpacity(0.4)
                         : Colors.transparent),
-              border: active
-                  ? Border.all(color: c.withOpacity(0.25), width: 1)
-                  : null,
+              border: active ? Border.all(color: c.withOpacity(0.25)) : null,
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  width: active ? 36 : 28,
-                  height: active ? 36 : 28,
-                  child: Icon(
-                    widget.item.icon,
-                    size: active ? 20 : 18,
-                    color: iconColor,
-                  ),
+                Icon(
+                  widget.item.icon,
+                  size: active ? 20 : 18,
+                  color: iconColor,
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  widget.item.label,
+                  widget.item.label(l10n),
                   style: GoogleFonts.inter(
                     fontSize: 8,
                     fontWeight: active ? FontWeight.w600 : FontWeight.w400,
                     color: iconColor,
+                    decoration: TextDecoration.none,
                   ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
