@@ -4,7 +4,11 @@
 // all animations use vsync + RepaintBoundary so the orb layer repaints
 // independently from the rest of the widget tree.
 
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
+import '../providers/settings_provider.dart';
 
 class AnimatedBackground extends StatefulWidget {
   final Widget child;
@@ -52,8 +56,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
         // ── Layer 1: Base gradient (repaints on theme change only) ────────────
         _BaseGradient(isDark: isDark, animation: _cBg),
         // ── Layer 2: Custom photo overlay (if backgroundx.png exists) ─────────
-        const _PhotoOverlay(),
-        // ── Layer 3: Animated aurora orbs (RepaintBoundary isolated) ──────────
+        const _PhotoOverlay(), // ── Layer 3: Animated aurora orbs (RepaintBoundary isolated) ──────────
         RepaintBoundary(
           child: AnimatedBuilder(
             animation: Listenable.merge([_c1, _c2, _c3]),
@@ -145,6 +148,10 @@ class _BaseGradient extends StatelessWidget {
 }
 
 // ── Photo overlay ──────────────────────────────────────────────────────────────
+// Loads backgroundx.png from the filesystem (placed by user at
+// HBR/Assets/photo/backgroundx.png) using a path relative to the running
+// executable. The file is NOT bundled in Flutter assets — it lives outside
+// the build output alongside the EngineX scripts.
 class _PhotoOverlay extends StatefulWidget {
   const _PhotoOverlay();
   @override
@@ -153,13 +160,31 @@ class _PhotoOverlay extends StatefulWidget {
 
 class _PhotoOverlayState extends State<_PhotoOverlay>
     with SingleTickerProviderStateMixin {
-  bool _hasImage = false;
+  File? _imageFile;
   late final AnimationController _fade = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 3),
   )..repeat(reverse: true);
 
-  static const String _assetPath = 'assets/photo/backgroundx.png';
+  /// Resolves the background image path: 6 levels up from the executable,
+  /// then Assets/photo/backgroundx.png — same root as EngineX scripts.
+  static String _resolvePath() {
+    final exe = Platform.resolvedExecutable;
+    return p.normalize(
+      p.join(
+        p.dirname(exe),
+        '..',
+        '..',
+        '..',
+        '..',
+        '..',
+        '..',
+        'Assets',
+        'photo',
+        'backgroundx.png',
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -168,12 +193,10 @@ class _PhotoOverlayState extends State<_PhotoOverlay>
   }
 
   Future<void> _checkImage() async {
-    // Check if asset exists (it's bundled) — try/catch for graceful fallback
-    try {
-      await DefaultAssetBundle.of(context).load(_assetPath);
-      if (mounted) setState(() => _hasImage = true);
-    } catch (_) {
-      // Asset not found — background image not added yet
+    final path = _resolvePath();
+    final file = File(path);
+    if (await file.exists()) {
+      if (mounted) setState(() => _imageFile = file);
     }
   }
 
@@ -185,17 +208,19 @@ class _PhotoOverlayState extends State<_PhotoOverlay>
 
   @override
   Widget build(BuildContext context) {
-    if (!_hasImage) return const SizedBox.shrink();
+    final show = context.watch<SettingsProvider>().showBackground;
+    if (!show || _imageFile == null) return const SizedBox.shrink();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return AnimatedBuilder(
       animation: _fade,
       builder: (_, __) => Opacity(
         opacity: isDark ? 0.12 + _fade.value * 0.04 : 0.14 + _fade.value * 0.04,
-        child: Image.asset(
-          _assetPath,
+        child: Image.file(
+          _imageFile!,
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
+          cacheWidth: 1920,
         ),
       ),
     );

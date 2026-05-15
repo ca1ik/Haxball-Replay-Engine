@@ -153,6 +153,14 @@ class _AppearanceCard extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 16),
+        _ToggleRow(
+          label: 'Background Image',
+          sublabel: 'Show backgroundx.png overlay on aurora',
+          value: settings.showBackground,
+          onChanged: settings.setShowBackground,
+          color: const Color(0xFF7B5EA7),
+        ),
       ],
     ),
   );

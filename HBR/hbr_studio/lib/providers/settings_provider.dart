@@ -6,10 +6,12 @@ class SettingsProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.dark;
   String _lang = 'en';
   bool _highRefreshRate = true;
+  bool _showBackground = true;
 
   ThemeMode get themeMode => _themeMode;
   String get lang => _lang;
   bool get highRefreshRate => _highRefreshRate;
+  bool get showBackground => _showBackground;
   bool get isDark => _themeMode == ThemeMode.dark;
 
   SettingsProvider() {
@@ -23,6 +25,7 @@ class SettingsProvider extends ChangeNotifier {
         : ThemeMode.light;
     _lang = prefs.getString('lang') ?? 'en';
     _highRefreshRate = prefs.getBool('highRefreshRate') ?? true;
+    _showBackground = prefs.getBool('showBackground') ?? true;
     notifyListeners();
   }
 
@@ -45,5 +48,12 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('highRefreshRate', v);
+  }
+
+  Future<void> setShowBackground(bool v) async {
+    _showBackground = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('showBackground', v);
   }
 }

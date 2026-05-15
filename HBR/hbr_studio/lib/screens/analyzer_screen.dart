@@ -16,6 +16,7 @@ import '../providers/settings_provider.dart';
 import '../services/analyzer_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
+import 'replay_viewer_screen.dart';
 
 class AnalyzerScreen extends StatefulWidget {
   const AnalyzerScreen({super.key});
@@ -125,6 +126,22 @@ class _AnalyzerScreenState extends State<AnalyzerScreen> {
             ),
           ),
           style: TextButton.styleFrom(foregroundColor: AppTheme.textHint),
+        ),
+        const SizedBox(width: 8),
+        GradientButton(
+          label: 'Watch',
+          icon: Icons.play_circle_outline_rounded,
+          onPressed: () {
+            final path = rp.loadedPath;
+            if (path == null) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ReplayViewerScreen(filePath: path),
+                fullscreenDialog: true,
+              ),
+            );
+          },
         ),
         const SizedBox(width: 8),
         GradientButton(
@@ -253,36 +270,170 @@ class _AnalyzerScreenState extends State<AnalyzerScreen> {
 }
 
 // ── Stats View ─────────────────────────────────────────────────────────────────
-class _StatsView extends StatelessWidget {
+class _StatsView extends StatefulWidget {
   final MatchStats stats;
   const _StatsView({required this.stats});
 
   @override
+  State<_StatsView> createState() => _StatsViewState();
+}
+
+class _StatsViewState extends State<_StatsView> {
+  int _halfTab = 0; // 0=Total, 1=1st Half, 2=2nd Half
+
+  MatchStats get _halfStats {
+    if (_halfTab == 0) return widget.stats;
+    final s = widget.stats;
+    final half = s.totalFrames ~/ 2;
+    final filtered = _halfTab == 1
+        ? s.goals.where((g) => g.frameNo <= half).toList()
+        : s.goals.where((g) => g.frameNo > half).toList();
+    // Recompute team scores
+    final redGoals = filtered.where((g) => g.scoringTeam == 1).length;
+    final blueGoals = filtered.where((g) => g.scoringTeam == 2).length;
+    // Recompute player stats from filtered goals
+    final pStats = s.playerStats.map((p) {
+      final g = filtered.where((goal) => goal.scorer == p.name).length;
+      final a = filtered.where((goal) => goal.assist == p.name).length;
+      return PlayerStat(
+        id: p.id,
+        name: p.name,
+        team: p.team,
+        goals: g,
+        assists: a,
+        kicks: p.kicks, // kicks not half-filterable without frame data
+      );
+    }).toList();
+    return MatchStats(
+      fileName: s.fileName,
+      totalFrames: s.totalFrames,
+      durationSec: s.durationSec ~/ 2,
+      duration: _secToMmSs(s.durationSec ~/ 2),
+      redTeam: TeamStats(score: redGoals, players: s.redTeam.players),
+      blueTeam: TeamStats(score: blueGoals, players: s.blueTeam.players),
+      goals: filtered,
+      playerStats: pStats,
+      possession: s.possession,
+      events: s.events,
+      goalCount: filtered.length,
+    );
+  }
+
+  String _secToMmSs(int sec) {
+    final m = sec ~/ 60;
+    final s = sec % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final display = _halfStats;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Half tabs ───────────────────────────────────────────────────────
+          _HalfTabBar(
+            selected: _halfTab,
+            onSelect: (i) => setState(() => _halfTab = i),
+            stats: widget.stats,
+          ).animate().fadeIn(duration: 300.ms),
+          const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _ScoreCard(stats: stats)),
+              Expanded(child: _ScoreCard(stats: display)),
               const SizedBox(width: 16),
-              Expanded(child: _PossessionCard(stats: stats)),
+              Expanded(child: _PossessionCard(stats: display)),
               const SizedBox(width: 16),
-              Expanded(child: _InfoCard(stats: stats)),
+              Expanded(child: _InfoCard(stats: display)),
             ],
           ).animate().fadeIn(duration: 400.ms),
           const SizedBox(height: 20),
           _GoalTimeline(
-            stats: stats,
+            stats: display,
           ).animate().fadeIn(duration: 500.ms, delay: 100.ms),
           const SizedBox(height: 20),
           _PlayerTable(
-            stats: stats,
+            stats: display,
           ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
         ],
       ),
+    );
+  }
+}
+
+// ── Half tab bar ───────────────────────────────────────────────────────────────
+class _HalfTabBar extends StatelessWidget {
+  final int selected;
+  final ValueChanged<int> onSelect;
+  final MatchStats stats;
+  const _HalfTabBar({
+    required this.selected,
+    required this.onSelect,
+    required this.stats,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final half = stats.totalFrames ~/ 2;
+    final firstGoals = stats.goals.where((g) => g.frameNo <= half).length;
+    final secondGoals = stats.goals.where((g) => g.frameNo > half).length;
+    final labels = [
+      ('Total', '${stats.goalCount} goals'),
+      ('1st Half', '$firstGoals goals'),
+      ('2nd Half', '$secondGoals goals'),
+    ];
+    return Row(
+      children: List.generate(labels.length, (i) {
+        final active = selected == i;
+        return Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: GestureDetector(
+            onTap: () => onSelect(i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: active
+                    ? AppTheme.accent.withOpacity(0.12)
+                    : AppTheme.surfaceOf(context),
+                border: Border.all(
+                  color: active
+                      ? AppTheme.accent.withOpacity(0.5)
+                      : AppTheme.borderOf(context),
+                  width: active ? 1.5 : 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    labels[i].$1,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                      color: active
+                          ? AppTheme.accent
+                          : AppTheme.textPrimOf(context),
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                  Text(
+                    labels[i].$2,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: AppTheme.textHintOf(context),
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
     );
   }
 }

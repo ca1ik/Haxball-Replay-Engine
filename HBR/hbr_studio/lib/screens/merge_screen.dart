@@ -357,101 +357,104 @@ class _MergeScreenState extends State<MergeScreen> {
           gradient: AppTheme.cardGradOf(context),
           border: Border.all(color: AppTheme.borderOf(context)),
         ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 6,
-          ),
-          leading: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppTheme.accentGrad.colors.first.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
+        child: Material(
+          type: MaterialType.transparency,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 6,
             ),
-            child: Center(
-              child: Text(
-                '${index + 1}',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.accent,
-                ),
+            leading: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppTheme.accentGrad.colors.first.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
               ),
-            ),
-          ),
-          title: Text(
-            f.name,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.textPrimOf(context),
-              decoration: TextDecoration.none,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: f.probing
-              ? Text(
-                  'Analysing...',
+              child: Center(
+                child: Text(
+                  '${index + 1}',
                   style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: AppTheme.textHint,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.accent,
                   ),
-                )
-              : Row(
-                  children: [
-                    if (frames != null) ...[
-                      Icon(
-                        Icons.timer_outlined,
-                        size: 11,
-                        color: AppTheme.textHint,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        framesToDuration(frames),
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: AppTheme.textSec,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                    if (goals != null) ...[
-                      Icon(
-                        Icons.sports_soccer_rounded,
-                        size: 11,
-                        color: AppTheme.textHint,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$goals goals',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: AppTheme.textSec,
-                        ),
-                      ),
-                    ],
-                  ],
                 ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.drag_handle_rounded,
-                color: AppTheme.textHint,
-                size: 18,
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => _removeFile(index),
-                child: const Icon(
-                  Icons.close_rounded,
+            ),
+            title: Text(
+              f.name,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textPrimOf(context),
+                decoration: TextDecoration.none,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: f.probing
+                ? Text(
+                    'Analysing...',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: AppTheme.textHint,
+                    ),
+                  )
+                : Row(
+                    children: [
+                      if (frames != null) ...[
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 11,
+                          color: AppTheme.textHint,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          framesToDuration(frames),
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppTheme.textSec,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      if (goals != null) ...[
+                        Icon(
+                          Icons.sports_soccer_rounded,
+                          size: 11,
+                          color: AppTheme.textHint,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$goals goals',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppTheme.textSec,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.drag_handle_rounded,
                   color: AppTheme.textHint,
                   size: 18,
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => _removeFile(index),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: AppTheme.textHint,
+                    size: 18,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
