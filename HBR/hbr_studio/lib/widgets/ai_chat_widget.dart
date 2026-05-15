@@ -27,7 +27,6 @@ class AiChatWidget extends StatefulWidget {
 class _AiChatWidgetState extends State<AiChatWidget>
     with TickerProviderStateMixin {
   bool _open = false;
-  Offset? _fabOffset; // null = not yet initialized (use center-bottom default)
   final List<ChatMessage> _messages = [];
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _scroll = ScrollController();
@@ -354,21 +353,14 @@ class _AiChatWidgetState extends State<AiChatWidget>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    // Default: center-bottom (fab is 52px wide, 24px from bottom)
-    _fabOffset ??= Offset((size.width - 52) / 2, size.height - 52 - 24);
+    // FAB is always centered at the bottom — no dragging
+    const fabW = 52.0;
+    const fabMarginBottom = 20.0;
+    final fabLeft = (size.width - fabW) / 2;
 
-    // Clamp so the FAB stays on screen
-    _fabOffset = Offset(
-      _fabOffset!.dx.clamp(0.0, size.width - 52),
-      _fabOffset!.dy.clamp(0.0, size.height - 52),
-    );
-
-    // Panel opens above the FAB
-    final panelLeft = (_fabOffset!.dx - 380 / 2 + 26).clamp(
-      8.0,
-      size.width - 388,
-    );
-    final panelTop = (_fabOffset!.dy - 520 - 16).clamp(8.0, size.height - 540);
+    // Panel opens above the FAB, centered
+    final panelLeft = ((size.width - 380) / 2).clamp(8.0, size.width - 388);
+    const panelBottom = fabMarginBottom + fabW + 16;
 
     return Stack(
       children: [
@@ -376,7 +368,7 @@ class _AiChatWidgetState extends State<AiChatWidget>
         if (_open)
           Positioned(
             left: panelLeft,
-            top: panelTop,
+            bottom: panelBottom,
             child: Material(
               color: Colors.transparent,
               child: _ChatPanel(
@@ -392,19 +384,14 @@ class _AiChatWidgetState extends State<AiChatWidget>
               ),
             ).animate().slideY(begin: 0.1).fadeIn(duration: 250.ms),
           ),
-        // ── FAB (draggable) ────────────────────────────────────────────────────────
+        // ── FAB (fixed bottom center) ─────────────────────────────────────────────
         Positioned(
-          left: _fabOffset!.dx,
-          top: _fabOffset!.dy,
-          child: GestureDetector(
-            onPanUpdate: (d) => setState(() {
-              _fabOffset = _fabOffset! + d.delta;
-            }),
-            child: _AiFab(
-              open: _open,
-              ringAnimation: _ring,
-              onTap: () => setState(() => _open = !_open),
-            ),
+          left: fabLeft,
+          bottom: fabMarginBottom,
+          child: _AiFab(
+            open: _open,
+            ringAnimation: _ring,
+            onTap: () => setState(() => _open = !_open),
           ),
         ),
       ],

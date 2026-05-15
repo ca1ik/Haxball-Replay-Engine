@@ -31,7 +31,8 @@ class _MergeScreenState extends State<MergeScreen> {
   final List<ReplayFile> _files = [];
   bool _dragging = false;
   bool _running = false;
-  String? _outputPath;
+  String? _outputDir; // selected directory
+  String? _lastOutputPath; // last written file
   final List<String> _logLines = [];
   double _progress = 0;
   String? _resultMessage;
@@ -87,20 +88,17 @@ class _MergeScreenState extends State<MergeScreen> {
   }
 
   Future<void> _pickOutput() async {
-    final dir = await getDownloadsDirectory() ?? await getTemporaryDirectory();
-    final result = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save merged replay as...',
-      fileName: 'merged_${DateTime.now().millisecondsSinceEpoch}.hbr2',
-      initialDirectory: dir.path,
-      type: FileType.custom,
-      allowedExtensions: ['hbr2'],
+    final downloadsDir = (await getDownloadsDirectory())?.path;
+    final result = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Choose output folder...',
+      initialDirectory: downloadsDir,
     );
-    if (result != null) setState(() => _outputPath = result);
+    if (result != null) setState(() => _outputDir = result);
   }
 
   Future<void> _runMerge() async {
     if (_files.length < 2) return;
-    final outPath = _outputPath ?? await _defaultOutput();
+    final outPath = await _buildOutPath();
 
     setState(() {
       _running = true;
@@ -134,12 +132,12 @@ class _MergeScreenState extends State<MergeScreen> {
           case 'done':
             _progress = 1.0;
             _success = true;
-            _outputPath = evt['output'] as String?;
+            _lastOutputPath = evt['output'] as String?;
             final size = ((evt['bytes'] as int? ?? 0) / 1024).toStringAsFixed(
               1,
             );
             _resultMessage =
-                'Merged ${_files.length} files → ${p.basename(_outputPath!)}  (${size} KB)';
+                'Merged ${_files.length} files → ${p.basename(_lastOutputPath!)}  (${size} KB)';
             _logLines.add(
               'Done! ${evt['frames']} frames · ${evt['events']} events · ${evt['goals']} goals',
             );
@@ -170,12 +168,14 @@ class _MergeScreenState extends State<MergeScreen> {
     }
   }
 
-  Future<String> _defaultOutput() async {
+  Future<String> _buildOutPath() async {
+    final dir = _outputDir ?? await _defaultOutputDir();
+    return p.join(dir, 'merged_${DateTime.now().millisecondsSinceEpoch}.hbr2');
+  }
+
+  Future<String> _defaultOutputDir() async {
     final dir = await getDownloadsDirectory() ?? await getTemporaryDirectory();
-    return p.join(
-      dir.path,
-      'merged_${DateTime.now().millisecondsSinceEpoch}.hbr2',
-    );
+    return dir.path;
   }
 
   void _removeFile(int index) => setState(() => _files.removeAt(index));
@@ -499,16 +499,18 @@ class _MergeScreenState extends State<MergeScreen> {
           ),
           child: Row(
             children: [
-              Icon(Icons.save_alt_rounded, size: 15, color: AppTheme.textHint),
+              Icon(
+                Icons.folder_rounded,
+                size: 15,
+                color: _outputDir != null ? AppTheme.accent : AppTheme.textHint,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  _outputPath != null
-                      ? p.basename(_outputPath!)
-                      : 'Auto-generated in Downloads',
+                  _outputDir ?? 'Downloads (default)',
                   style: GoogleFonts.inter(
                     fontSize: 12,
-                    color: _outputPath != null
+                    color: _outputDir != null
                         ? AppTheme.textPrim
                         : AppTheme.textHint,
                   ),
@@ -716,9 +718,10 @@ class _MergeScreenState extends State<MergeScreen> {
             ),
           ),
         ),
-        if (_success && _outputPath != null)
+        if (_success && _lastOutputPath != null)
           GestureDetector(
-            onTap: () => Process.run('explorer', ['/select,', _outputPath!]),
+            onTap: () =>
+                Process.run('explorer', ['/select,', _lastOutputPath!]),
             child: Text(
               'Show file',
               style: GoogleFonts.inter(

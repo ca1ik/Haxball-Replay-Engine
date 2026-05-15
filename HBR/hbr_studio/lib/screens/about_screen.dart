@@ -254,9 +254,83 @@ class AboutScreen extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: 24),
+        _buildAiSection(context),
       ],
     ),
   ).animate().fadeIn(duration: 500.ms, delay: 100.ms);
+
+  Widget _buildAiSection(BuildContext context) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          const Color(0xFF4A6CF7).withOpacity(0.08),
+          const Color(0xFF7B5EA7).withOpacity(0.08),
+        ],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFF7B5EA7).withOpacity(0.2)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF4A6CF7), Color(0xFF7B5EA7)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(
+            Icons.auto_awesome_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'AI Assistant',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  foreground: Paint()
+                    ..shader = const LinearGradient(
+                      colors: [Color(0xFF4A6CF7), Color(0xFF7B5EA7)],
+                    ).createShader(const Rect.fromLTWH(0, 0, 200, 20)),
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'HBR Studio includes an integrated AI assistant built on top of a large language model. '
+                'It understands the structure of HaxBall replays — frames, physics, goals, halftimes — and '
+                'can answer questions about your recordings, explain what merge or split operations do, '
+                'and guide you through any workflow. Think of it as having a knowledgeable replay engineer '
+                'on call, always available in the corner of the screen.',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: AppTheme.textSecOf(context),
+                  height: 1.65,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _buildTechStack(BuildContext context) => GlassCard(
     padding: const EdgeInsets.all(20),
@@ -364,7 +438,7 @@ class AboutScreen extends StatelessWidget {
           (c) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: GestureDetector(
-              onTap: () => launchUrl(Uri.parse(c.$3)),
+              onTap: () => launchUrl(Uri.parse(c.$5)),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -396,7 +470,7 @@ class AboutScreen extends StatelessWidget {
                             c.$3,
                             style: GoogleFonts.inter(
                               fontSize: 10,
-                              color: AppTheme.textHintOf(context),
+                              color: c.$4.withOpacity(0.7),
                               decoration: TextDecoration.none,
                             ),
                             maxLines: 1,
@@ -443,26 +517,30 @@ class AboutScreen extends StatelessWidget {
     (
       Icons.code_rounded,
       'GitHub',
-      'https://github.com/codemations/hbr-studio',
+      'github.com/ca1ik',
       Color(0xFFE8EAF2),
+      'https://github.com/ca1ik',
     ),
     (
       Icons.discord_rounded,
-      'Discord Community',
-      'https://discord.gg/haxball',
+      'Discord',
+      '@natroffz',
       Color(0xFF7289DA),
+      'https://discord.gg/haxball',
     ),
     (
       Icons.mail_outline_rounded,
       'Email',
-      'hello@codemations.dev',
+      'calikai.dev@gmail.com',
       AppTheme.accent,
+      'mailto:calikai.dev@gmail.com',
     ),
     (
       Icons.sports_soccer_rounded,
-      'HaxBall Forum',
-      'https://www.haxball.com',
+      'Haxball',
+      'haxball.com',
       Color(0xFFFF8C42),
+      'https://haxball.com',
     ),
   ];
 
@@ -499,55 +577,55 @@ class AboutScreen extends StatelessWidget {
     (
       Icons.merge_type_rounded,
       'N-File Merge',
-      'Combine 2+ replays in any order',
+      'Seamlessly combine 2+ replay files into one continuous match, with automatic spawn-order normalization',
       AppTheme.accent,
     ),
     (
       Icons.content_cut_rounded,
       'Precision Split',
-      'Cut at any MM:SS with a slider',
+      'Trim any replay at an exact MM:SS using the interactive slider — no guessing, no binary search',
       AppTheme.purple,
     ),
     (
       Icons.drag_handle_rounded,
       'Drag & Drop',
-      'Drop .hbr2 files directly into the app',
+      'Load .hbr2 files by dragging them from Explorer directly onto any drop zone in the app',
       Color(0xFF4A6CF7),
     ),
     (
       Icons.sync_alt_rounded,
       'Physics Accurate',
-      'Exact spawn order preserved — no divergence',
+      'Uses node-haxball v2.3.0 — the official engine — for byte-identical output with no physics drift',
       Color(0xFF00C9FF),
     ),
     (
       Icons.bar_chart_rounded,
       'File Preview',
-      'Instant probe: duration, frames, goals',
+      'Instantly see duration, frame count, goal count and team scores for any loaded replay file',
       Color(0xFFFF8C42),
     ),
     (
       Icons.animation_rounded,
-      'Visual Animations',
-      'Animated merge/split flow diagrams',
+      'Visual Guide',
+      'Interactive animated diagrams explain the merge and split flows step-by-step',
       Color(0xFFFF4D6A),
     ),
     (
       Icons.folder_open_rounded,
       'Smart Output',
-      'Auto-save to Downloads or custom path',
+      'Results save to Downloads by default; pick any directory and the choice is remembered',
       AppTheme.success,
     ),
     (
       Icons.terminal_rounded,
       'Live Log',
-      'Real-time progress output per operation',
+      'Streaming real-time output from the Node.js engine so you always know what is happening',
       AppTheme.textSec,
     ),
     (
-      Icons.dark_mode_rounded,
-      'Dark Native UI',
-      'Custom title bar, aurora background',
+      Icons.auto_awesome_rounded,
+      'AI Assistant',
+      'An LLM-powered chat assistant that understands replay structure and guides you through every workflow',
       Color(0xFF7B5EA7),
     ),
   ];
@@ -574,8 +652,10 @@ class _FeatureCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: AppTheme.surfaceOf(context),
-              border: Border.all(color: AppTheme.borderOf(context)),
+              color: AppTheme.surfaceOf(context).withOpacity(0.5),
+              border: Border.all(
+                color: AppTheme.borderOf(context).withOpacity(0.4),
+              ),
             ),
             child: Row(
               children: [

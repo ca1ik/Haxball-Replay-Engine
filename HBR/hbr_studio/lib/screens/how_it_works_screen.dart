@@ -16,6 +16,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
     with TickerProviderStateMixin {
   int _tab = 0;
   late final AnimationController _flowCtrl;
+  late final AnimationController _ledCtrl;
   bool _animating = false;
   // Interactive split point (0.0–1.0), draggable after animation ends
   double _splitRatio = 0.45;
@@ -27,11 +28,16 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2400),
     );
+    _ledCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
   }
 
   @override
   void dispose() {
     _flowCtrl.dispose();
+    _ledCtrl.dispose();
     super.dispose();
   }
 
@@ -64,7 +70,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
         height: 40,
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFFFF8C42), Color(0xFFFF4D6A)],
+            colors: [Color(0xFF4A6CF7), Color(0xFF7B5EA7)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -94,21 +100,33 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
           ),
         ],
       ),
-      const Spacer(),
-      GestureDetector(
+    ],
+  ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1);
+
+  Widget _buildPlayButton() => AnimatedBuilder(
+    animation: _ledCtrl,
+    builder: (context, _) {
+      final glow = (math.sin(_ledCtrl.value * math.pi * 2) * 0.5 + 0.5);
+      final borderColor = Color.lerp(
+        const Color(0xFF4A6CF7),
+        const Color(0xFF7B5EA7),
+        _ledCtrl.value,
+      )!;
+      return GestureDetector(
         onTap: _animating ? null : _playAnimation,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFFFF8C42), Color(0xFFFF4D6A)],
+              colors: [Color(0xFF4A6CF7), Color(0xFF7B5EA7)],
             ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: borderColor.withOpacity(0.9), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFFF8C42).withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: borderColor.withOpacity(0.25 + 0.35 * glow),
+                blurRadius: 10 + 12 * glow,
+                spreadRadius: glow * 2,
               ),
             ],
           ),
@@ -120,13 +138,13 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
                     ? Icons.hourglass_top_rounded
                     : Icons.play_arrow_rounded,
                 color: Colors.white,
-                size: 15,
+                size: 16,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
                 _animating ? 'Playing...' : 'Play Animation',
                 style: GoogleFonts.inter(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
@@ -134,9 +152,9 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
             ],
           ),
         ),
-      ),
-    ],
-  ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1);
+      );
+    },
+  );
 
   Widget _buildTabs() => Row(
     children: [
@@ -180,8 +198,10 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionLabel('Merge Flow Diagram'),
-        const SizedBox(height: 24),
-        _MergeDiagram(controller: _flowCtrl),
+        const SizedBox(height: 16),
+        Center(child: _buildPlayButton()),
+        const SizedBox(height: 20),
+        ClipRect(child: _MergeDiagram(controller: _flowCtrl)),
         const SizedBox(height: 24),
         _buildMergeTimeline(),
       ],
@@ -329,7 +349,9 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SectionLabel('Split Flow Diagram'),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+        Center(child: _buildPlayButton()),
+        const SizedBox(height: 20),
         _SplitDiagram(controller: _flowCtrl),
         const SizedBox(height: 24),
         _buildSplitTimeline(),
@@ -680,7 +702,7 @@ class _StepCard extends StatelessWidget {
       Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 color: AppTheme.surface,
@@ -715,7 +737,7 @@ class _StepCard extends StatelessWidget {
                         Text(
                           title,
                           style: GoogleFonts.inter(
-                            fontSize: 12,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: AppTheme.textPrim,
                           ),
@@ -724,7 +746,7 @@ class _StepCard extends StatelessWidget {
                         Text(
                           description,
                           style: GoogleFonts.inter(
-                            fontSize: 11,
+                            fontSize: 13,
                             color: AppTheme.textSec,
                             height: 1.4,
                           ),

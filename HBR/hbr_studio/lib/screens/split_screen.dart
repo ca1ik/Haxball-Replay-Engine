@@ -11,6 +11,22 @@ import '../services/node_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
 
+// ── Recent clip record ────────────────────────────────────────────────────
+class _RecentClip {
+  final String name;
+  final String path;
+  final String duration;
+  final String sourceName;
+  final DateTime createdAt;
+  _RecentClip({
+    required this.name,
+    required this.path,
+    required this.duration,
+    required this.sourceName,
+    required this.createdAt,
+  });
+}
+
 class SplitScreen extends StatefulWidget {
   const SplitScreen({super.key});
 
@@ -33,8 +49,10 @@ class _SplitScreenState extends State<SplitScreen> {
   final _endMinCtrl = TextEditingController(text: '1');
   final _endSecCtrl = TextEditingController(text: '15');
 
-  String? _outPath;
+  String? _outputDir; // selected output directory
+  String? _lastOutputPath; // last written file (for "open folder")
   final List<String> _logLines = [];
+  final List<_RecentClip> _recentClips = [];
   double _progress = 0;
   String? _resultMessage;
   bool _success = false;
@@ -95,18 +113,12 @@ class _SplitScreenState extends State<SplitScreen> {
   }
 
   Future<void> _pickOutput() async {
-    final dir = await getDownloadsDirectory() ?? await getTemporaryDirectory();
-    final base = _inputPath != null
-        ? p.basenameWithoutExtension(_inputPath!)
-        : 'replay';
-    final result = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save extracted clip as...',
-      fileName: '${base}_clip.hbr2',
-      initialDirectory: dir.path,
-      type: FileType.custom,
-      allowedExtensions: ['hbr2'],
+    final downloadsDir = (await getDownloadsDirectory())?.path;
+    final result = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Choose output folder...',
+      initialDirectory: downloadsDir,
     );
-    if (result != null) setState(() => _outPath = result);
+    if (result != null) setState(() => _outputDir = result);
   }
 
   Future<void> _runSplit() async {
@@ -115,9 +127,12 @@ class _SplitScreenState extends State<SplitScreen> {
     final ef = _endFrame;
     if (sf < 0 || ef <= sf || ef > _totalFrames) return;
 
-    final dir = await getDownloadsDirectory() ?? await getTemporaryDirectory();
+    final downloadsDir =
+        (await getDownloadsDirectory())?.path ??
+        (await getTemporaryDirectory()).path;
+    final outDir = _outputDir ?? downloadsDir;
     final base = p.basenameWithoutExtension(_inputPath!);
-    final out = _outPath ?? p.join(dir.path, '${base}_clip.hbr2');
+    final out = p.join(outDir, '${base}_clip.hbr2');
 
     setState(() {
       _running = true;
@@ -160,7 +175,7 @@ class _SplitScreenState extends State<SplitScreen> {
           case 'done':
             _progress = 1.0;
             _success = true;
-            _outPath = evt['output'] as String?;
+            _lastOutputPath = evt['output'] as String?;
             final size = ((evt['bytes'] as int? ?? 0) / 1024).toStringAsFixed(
               1,
             );
@@ -169,6 +184,18 @@ class _SplitScreenState extends State<SplitScreen> {
             _logLines.add(
               'Done! ${evt['frames']} frames · ${evt['goals']} goals',
             );
+            if (_lastOutputPath != null) {
+              _recentClips.insert(
+                0,
+                _RecentClip(
+                  name: p.basename(_lastOutputPath!),
+                  path: _lastOutputPath!,
+                  duration: '${framesToDuration(sf)} – ${framesToDuration(ef)}',
+                  sourceName: p.basename(_inputPath!),
+                  createdAt: DateTime.now(),
+                ),
+              );
+            }
             break;
           case 'error':
             _success = false;
@@ -339,27 +366,13 @@ class _SplitScreenState extends State<SplitScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                p.basename(_inputPath!),
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textPrimOf(context),
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                              Text(
-                                'Click to change file',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  color: AppTheme.textHintOf(context),
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            'Click to change file',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: AppTheme.textHintOf(context),
+                              decoration: TextDecoration.none,
+                            ),
                           ),
                         ],
                       )
@@ -725,7 +738,7 @@ class _SplitScreenState extends State<SplitScreen> {
   Widget _buildOutputSelector() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const SectionLabel('Output File'),
+      const SectionLabel('Output Folder'),
       const SizedBox(height: 8),
       GestureDetector(
         onTap: _running ? null : _pickOutput,
@@ -736,36 +749,25 @@ class _SplitScreenState extends State<SplitScreen> {
             color: AppTheme.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: _outPath != null
+              color: _outputDir != null
                   ? AppTheme.purple.withOpacity(0.3)
                   : AppTheme.border,
             ),
           ),
           child: Row(
             children: [
-              Container(
-                width: 14,
-                height: 14,
-                decoration: const BoxDecoration(
-                  color: AppTheme.purple,
-                  shape: BoxShape.circle,
-                ),
+              Icon(
+                Icons.folder_rounded,
+                size: 15,
+                color: _outputDir != null ? AppTheme.purple : AppTheme.textHint,
               ),
               const SizedBox(width: 10),
-              Text(
-                'Clip  ',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.purple,
-                ),
-              ),
               Expanded(
                 child: Text(
-                  _outPath != null ? p.basename(_outPath!) : 'Auto-generated',
+                  _outputDir ?? 'Downloads (default)',
                   style: GoogleFonts.inter(
                     fontSize: 11,
-                    color: _outPath != null
+                    color: _outputDir != null
                         ? AppTheme.textPrim
                         : AppTheme.textHint,
                   ),
@@ -841,8 +843,84 @@ class _SplitScreenState extends State<SplitScreen> {
         const SizedBox(height: 12),
         _buildResultBanner(),
       ],
+      _buildRecentClips(),
     ],
   ).animate().fadeIn(duration: 500.ms, delay: 200.ms);
+
+  Widget _buildRecentClips() {
+    if (_recentClips.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        const SectionLabel('Recent Clips'),
+        const SizedBox(height: 8),
+        ..._recentClips.map(_buildRecentClipCard),
+      ],
+    );
+  }
+
+  Widget _buildRecentClipCard(_RecentClip clip) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        onTap: () => _loadFile(clip.path),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppTheme.purple.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.video_file_rounded,
+                size: 15,
+                color: AppTheme.purple,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    clip.name,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.textPrimOf(context),
+                      decoration: TextDecoration.none,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    clip.duration,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: AppTheme.textHint,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Tooltip(
+              message: 'Source: ${clip.sourceName}',
+              child: const Icon(
+                Icons.info_outline_rounded,
+                size: 14,
+                color: AppTheme.textHint,
+              ),
+            ),
+          ],
+        ),
+      ).animate().fadeIn(duration: 250.ms),
+    );
+  }
 
   Widget _buildIdleInfo() {
     final items = [
@@ -984,7 +1062,9 @@ class _SplitScreenState extends State<SplitScreen> {
         if (_success)
           GestureDetector(
             onTap: () {
-              final dir = _outPath != null ? p.dirname(_outPath!) : null;
+              final dir = _lastOutputPath != null
+                  ? p.dirname(_lastOutputPath!)
+                  : _outputDir;
               if (dir != null) Process.run('explorer', [dir]);
             },
             child: Text(

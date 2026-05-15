@@ -1,4 +1,6 @@
 // lib/main.dart
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -401,7 +403,7 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 76,
+    width: 88,
     decoration: BoxDecoration(
       color: AppTheme.surfaceOf(context).withOpacity(0.7),
       border: Border(
@@ -465,8 +467,104 @@ class _NavBtn extends StatefulWidget {
   State<_NavBtn> createState() => _NavBtnState();
 }
 
-class _NavBtnState extends State<_NavBtn> {
+// ── Particle for analyze button hover effect ───────────────────────────────────
+class _NavParticle {
+  double x; // relative 0..1 within button width
+  double y; // relative 0..1 within button height, starting near center
+  double dy; // slow upward drift
+  double dx;
+  double opacity;
+  double radius;
+  Color color;
+
+  _NavParticle({
+    required this.x,
+    required this.y,
+    required this.dy,
+    required this.dx,
+    required this.opacity,
+    required this.radius,
+    required this.color,
+  });
+}
+
+class _NavBtnState extends State<_NavBtn> with TickerProviderStateMixin {
   bool _hovered = false;
+  final List<_NavParticle> _particles = [];
+  late final AnimationController _particleCtrl;
+  Timer? _spawnTimer;
+  final _rng = math.Random();
+
+  bool get _isAnalyze => widget.item == NavItem.analyze;
+  bool get _isAbout => widget.item == NavItem.about;
+
+  static const _purpleBlue = [
+    Color(0xFF7B5EA7),
+    Color(0xFF4A6CF7),
+    Color(0xFF00C9FF),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _particleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 50),
+    );
+    if (_isAnalyze) {
+      _particleCtrl.addListener(_updateParticles);
+      _particleCtrl.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _particleCtrl.removeListener(_updateParticles);
+    _particleCtrl.dispose();
+    _spawnTimer?.cancel();
+    super.dispose();
+  }
+
+  void _updateParticles() {
+    if (!mounted) return;
+    setState(() {
+      // Move + fade
+      for (final p in _particles) {
+        p.y -= p.dy;
+        p.x += p.dx;
+        p.opacity -= 0.012;
+      }
+      _particles.removeWhere((p) => p.opacity <= 0);
+    });
+  }
+
+  void _onHoverEnter() {
+    setState(() => _hovered = true);
+    if (!_isAnalyze) return;
+    _spawnTimer?.cancel();
+    _spawnTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (!mounted) return;
+      if (_particles.length >= 8) return;
+      setState(() {
+        _particles.add(
+          _NavParticle(
+            x: 0.2 + _rng.nextDouble() * 0.6,
+            y: 0.3 + _rng.nextDouble() * 0.4,
+            dy: 0.008 + _rng.nextDouble() * 0.006,
+            dx: (_rng.nextDouble() - 0.5) * 0.004,
+            opacity: 0.9,
+            radius: 2.5 + _rng.nextDouble() * 3.0,
+            color: _purpleBlue[_rng.nextInt(_purpleBlue.length)],
+          ),
+        );
+      });
+    });
+  }
+
+  void _onHoverExit() {
+    setState(() => _hovered = false);
+    _spawnTimer?.cancel();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -479,20 +577,43 @@ class _NavBtnState extends State<_NavBtn> {
               ? AppTheme.textSecOf(context)
               : AppTheme.textHintOf(context));
 
+    Widget iconWidget = Icon(
+      widget.item.icon,
+      size: active ? 22 : 20,
+      color: _isAbout ? null : iconColor,
+    );
+
+    // About: gradient icon
+    if (_isAbout) {
+      iconWidget = ShaderMask(
+        shaderCallback: (bounds) => const LinearGradient(
+          colors: [Color(0xFF7B5EA7), Color(0xFF4A6CF7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(bounds),
+        blendMode: BlendMode.srcIn,
+        child: Icon(
+          widget.item.icon,
+          size: active ? 22 : 20,
+          color: Colors.white,
+        ),
+      );
+    }
+
     return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onEnter: (_) => _onHoverEnter(),
+      onExit: (_) => _onHoverExit(),
       child: GestureDetector(
         onTap: widget.onTap,
         child: Tooltip(
           message: widget.item.label(l10n),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-            width: 56,
-            height: 54,
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            width: 72,
+            height: 62,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               color: active
                   ? c.withOpacity(0.12)
                   : (_hovered
@@ -500,32 +621,76 @@ class _NavBtnState extends State<_NavBtn> {
                         : Colors.transparent),
               border: active ? Border.all(color: c.withOpacity(0.25)) : null,
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  widget.item.icon,
-                  size: active ? 20 : 18,
-                  color: iconColor,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  widget.item.label(l10n),
-                  style: GoogleFonts.inter(
-                    fontSize: 8,
-                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                    color: iconColor,
-                    decoration: TextDecoration.none,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Particle layer (analyze only)
+                  if (_isAnalyze && _particles.isNotEmpty)
+                    Positioned.fill(
+                      child: LayoutBuilder(
+                        builder: (_, constraints) => CustomPaint(
+                          painter: _ParticlePainter(
+                            particles: _particles,
+                            w: constraints.maxWidth,
+                            h: constraints.maxHeight,
+                          ),
+                        ),
+                      ),
+                    ),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      iconWidget,
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.item.label(l10n),
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: active
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: _isAbout ? const Color(0xFF7B5EA7) : iconColor,
+                          decoration: TextDecoration.none,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+// ── Particle painter ─────────────────────────────────────────────────────────
+class _ParticlePainter extends CustomPainter {
+  final List<_NavParticle> particles;
+  final double w;
+  final double h;
+  const _ParticlePainter({
+    required this.particles,
+    required this.w,
+    required this.h,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in particles) {
+      final paint = Paint()
+        ..color = p.color.withOpacity(p.opacity.clamp(0.0, 1.0))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+      canvas.drawCircle(Offset(p.x * w, p.y * h), p.radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ParticlePainter old) => true;
 }
