@@ -49,6 +49,23 @@ class NodeService {
     ]);
   }
 
+  /// Trim [inputPath] to the segment [startFrame..endFrame] → [outputPath].
+  static Stream<Map<String, dynamic>> trim({
+    required String inputPath,
+    required String outputPath,
+    required int startFrame,
+    required int endFrame,
+  }) {
+    final scriptPath = p.join(_scriptDir, 'hbr_split_cli.js');
+    return _runScript(scriptPath, [
+      inputPath,
+      outputPath,
+      startFrame.toString(),
+      endFrame.toString(),
+      '--trim',
+    ]);
+  }
+
   /// Runs [scriptPath] with [args] via `node`, yields JSON event maps.
   static Stream<Map<String, dynamic>> _runScript(
     String scriptPath,

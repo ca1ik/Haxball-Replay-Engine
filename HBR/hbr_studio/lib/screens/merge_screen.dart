@@ -44,8 +44,18 @@ class _MergeScreenState extends State<MergeScreen> {
         .map((p) => ReplayFile(path: p))
         .toList();
     if (newFiles.isEmpty) return;
-    setState(() => _files.addAll(newFiles));
-    for (final f in newFiles) {
+
+    // Enforce maximum 2 files
+    final slots = 2 - _files.length;
+    if (slots <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maximum 2 files — remove one first.')),
+      );
+      return;
+    }
+    final toAdd = newFiles.take(slots).toList();
+    setState(() => _files.addAll(toAdd));
+    for (final f in toAdd) {
       _probeFile(f);
     }
   }
@@ -60,8 +70,14 @@ class _MergeScreenState extends State<MergeScreen> {
   }
 
   Future<void> _pickFiles() async {
+    if (_files.length >= 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maximum 2 files — remove one first.')),
+      );
+      return;
+    }
     final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
+      allowMultiple: _files.isEmpty, // pick 2 at once only when empty
       type: FileType.custom,
       allowedExtensions: ['hbr2'],
     );
@@ -223,7 +239,7 @@ class _MergeScreenState extends State<MergeScreen> {
             ),
           ),
           Text(
-            'Combine multiple .hbr2 files into one continuous replay',
+            'Combine 2 .hbr2 replays into one continuous file',
             style: GoogleFonts.inter(
               fontSize: 12,
               color: AppTheme.textSecOf(context),
@@ -233,11 +249,12 @@ class _MergeScreenState extends State<MergeScreen> {
         ],
       ),
       const Spacer(),
-      if (_files.length >= 2)
-        StatusBadge(
-          label: '${_files.length} files ready',
-          color: AppTheme.accent,
-        ).animate().fadeIn(duration: 300.ms),
+      StatusBadge(
+        label: _files.length >= 2
+            ? '2 / 2 ready'
+            : '${_files.length} / 2 loaded',
+        color: _files.length >= 2 ? AppTheme.accent : AppTheme.textHint,
+      ).animate().fadeIn(duration: 300.ms),
     ],
   ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1);
 
@@ -286,7 +303,11 @@ class _MergeScreenState extends State<MergeScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                _dragging ? 'Drop files here' : 'Drag & drop .hbr2 files',
+                _dragging
+                    ? 'Drop .hbr2 file here'
+                    : _files.isEmpty
+                    ? 'Drag & drop 2 .hbr2 files'
+                    : 'Drop the 2nd .hbr2 file',
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -318,7 +339,7 @@ class _MergeScreenState extends State<MergeScreen> {
       children: [
         Row(
           children: [
-            const SectionLabel('Files  ·  drag to reorder'),
+            const SectionLabel('Files  ·  exactly 2 required'),
             const Spacer(),
             GestureDetector(
               onTap: () => setState(() => _files.clear()),

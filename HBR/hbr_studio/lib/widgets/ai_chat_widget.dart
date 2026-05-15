@@ -27,6 +27,7 @@ class AiChatWidget extends StatefulWidget {
 class _AiChatWidgetState extends State<AiChatWidget>
     with TickerProviderStateMixin {
   bool _open = false;
+  Offset? _fabOffset; // null = not yet initialized (use center-bottom default)
   final List<ChatMessage> _messages = [];
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _scroll = ScrollController();
@@ -88,12 +89,12 @@ class _AiChatWidgetState extends State<AiChatWidget>
     // ── Greeting
     if (RegExp(r'\b(hi|hello|hey|merhaba|selam|yo)\b').hasMatch(lower)) {
       return isTr
-          ? 'Merhaba! 👋 HaxReplay AI olarak sana yardımcı olmaya hazırım.\n\n'
+          ? 'Merhaba! 👋 HaxReplay Assistant olarak sana yardımcı olmaya hazırım.\n\n'
                 '• Replay yükle → maç istatistiklerini göstereyim\n'
                 '• "X dakikada böl" → split işlemi yap\n'
                 '• "Birleştir" → merge rehberi\n\n'
                 'Ne yapmak istersin?'
-          : 'Hey! 👋 I\'m HaxReplay AI.\n\n'
+          : 'Hey! 👋 I\'m HaxReplay Assistant.\n\n'
                 '• Load a replay → I\'ll show match stats\n'
                 '• "Split at 7:30" → I\'ll guide the split\n'
                 '• "Merge files" → step-by-step merge guide\n\n'
@@ -174,14 +175,14 @@ class _AiChatWidgetState extends State<AiChatWidget>
       r'\b(help|yardım|ne yapabilir|what can|nasıl)\b',
     ).hasMatch(lower)) {
       return isTr
-          ? '🤖 **HaxReplay AI yapabilecekleri:**\n\n'
+          ? '🤖 **HaxReplay Assistant yapabilecekleri:**\n\n'
                 '• 📊 Maç istatistiklerini gösterme (goller, asistler, hakimiyet)\n'
                 '• ✂️ Replay bölme rehberi (MM:SS)\n'
                 '• 🔗 Replay birleştirme rehberi\n'
                 '• 🎯 HaxBall hilelerini öğretme\n'
                 '• 🌐 Türkçe & İngilizce konuşma\n\n'
                 'Bir replay yükledikten sonra daha detaylı analiz yapabilirim!'
-          : '🤖 **HaxReplay AI capabilities:**\n\n'
+          : '🤖 **HaxReplay Assistant capabilities:**\n\n'
                 '• 📊 Show match stats (goals, assists, possession)\n'
                 '• ✂️ Guide you through replay splitting (MM:SS)\n'
                 '• 🔗 Guide you through merging replays\n'
@@ -352,13 +353,30 @@ class _AiChatWidgetState extends State<AiChatWidget>
   // ── Build ─────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    // Default: center-bottom (fab is 52px wide, 24px from bottom)
+    _fabOffset ??= Offset((size.width - 52) / 2, size.height - 52 - 24);
+
+    // Clamp so the FAB stays on screen
+    _fabOffset = Offset(
+      _fabOffset!.dx.clamp(0.0, size.width - 52),
+      _fabOffset!.dy.clamp(0.0, size.height - 52),
+    );
+
+    // Panel opens above the FAB
+    final panelLeft = (_fabOffset!.dx - 380 / 2 + 26).clamp(
+      8.0,
+      size.width - 388,
+    );
+    final panelTop = (_fabOffset!.dy - 520 - 16).clamp(8.0, size.height - 540);
+
     return Stack(
       children: [
         // ── Panel ──────────────────────────────────────────────────────────────────
         if (_open)
           Positioned(
-            right: 20,
-            bottom: 80,
+            left: panelLeft,
+            top: panelTop,
             child: Material(
               color: Colors.transparent,
               child: _ChatPanel(
@@ -374,14 +392,19 @@ class _AiChatWidgetState extends State<AiChatWidget>
               ),
             ).animate().slideY(begin: 0.1).fadeIn(duration: 250.ms),
           ),
-        // ── FAB ────────────────────────────────────────────────────────────────────
+        // ── FAB (draggable) ────────────────────────────────────────────────────────
         Positioned(
-          right: 24,
-          bottom: 24,
-          child: _AiFab(
-            open: _open,
-            ringAnimation: _ring,
-            onTap: () => setState(() => _open = !_open),
+          left: _fabOffset!.dx,
+          top: _fabOffset!.dy,
+          child: GestureDetector(
+            onPanUpdate: (d) => setState(() {
+              _fabOffset = _fabOffset! + d.delta;
+            }),
+            child: _AiFab(
+              open: _open,
+              ringAnimation: _ring,
+              onTap: () => setState(() => _open = !_open),
+            ),
           ),
         ),
       ],

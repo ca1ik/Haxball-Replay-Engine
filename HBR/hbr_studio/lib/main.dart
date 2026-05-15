@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:webview_windows/webview_windows.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'core/app_l10n.dart';
@@ -24,6 +25,10 @@ void main() async {
   // Enable pointer-event resampling for ultra-smooth 144/240/360Hz displays
   GestureBinding.instance.resamplingEnabled = true;
   await windowManager.ensureInitialized();
+  // Allow haxball.com (HTTPS) to fetch the replay file from our local HTTP server
+  await WebviewController.initializeEnvironment(
+    additionalArguments: '--allow-running-insecure-content',
+  );
 
   const options = WindowOptions(
     size: Size(1340, 820),

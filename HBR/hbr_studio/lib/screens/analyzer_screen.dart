@@ -59,6 +59,10 @@ class _AnalyzerScreenState extends State<AnalyzerScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildHeader(rp),
+        if (rp.hasStats && !rp.analyzing) ...[
+          const SizedBox(height: 12),
+          _buildActionBar(rp),
+        ],
         const SizedBox(height: 20),
         Expanded(
           child: rp.hasStats && !rp.analyzing
@@ -112,7 +116,7 @@ class _AnalyzerScreenState extends State<AnalyzerScreen> {
         ],
       ),
       const Spacer(),
-      if (rp.hasStats) ...[
+      if (rp.hasStats)
         TextButton.icon(
           onPressed: () {
             context.read<ReplayProvider>().clear();
@@ -127,10 +131,23 @@ class _AnalyzerScreenState extends State<AnalyzerScreen> {
           ),
           style: TextButton.styleFrom(foregroundColor: AppTheme.textHint),
         ),
-        const SizedBox(width: 8),
-        GradientButton(
+    ],
+  ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1);
+
+  Widget _buildActionBar(ReplayProvider rp) => Center(
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _LedButton(
           label: 'Watch',
-          icon: Icons.play_circle_outline_rounded,
+          icon: Icons.play_circle_filled_rounded,
+          gradient: const LinearGradient(
+            colors: [Color(0xFF7B5EA7), Color(0xFF4A6CF7)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderColor: Colors.white.withOpacity(0.55),
+          glowColor: Colors.white.withOpacity(0.25),
           onPressed: () {
             final path = rp.loadedPath;
             if (path == null) return;
@@ -143,15 +160,22 @@ class _AnalyzerScreenState extends State<AnalyzerScreen> {
             );
           },
         ),
-        const SizedBox(width: 8),
-        GradientButton(
+        const SizedBox(width: 16),
+        _LedButton(
           label: 'Load Another',
           icon: Icons.folder_open_rounded,
+          gradient: const LinearGradient(
+            colors: [Color(0xFF4A9EFF), Color(0xFF0A0E1A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderColor: const Color(0xFF4A9EFF).withOpacity(0.65),
+          glowColor: const Color(0xFF4A9EFF).withOpacity(0.35),
           onPressed: _pick,
         ),
       ],
-    ],
-  ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1);
+    ),
+  ).animate().fadeIn(duration: 350.ms, delay: 50.ms);
 
   Widget _buildDropZone(ReplayProvider rp) => Center(
     child: DropTarget(
@@ -439,58 +463,129 @@ class _HalfTabBar extends StatelessWidget {
 }
 
 // ── Score Card ─────────────────────────────────────────────────────────────────
-class _ScoreCard extends StatelessWidget {
+class _ScoreCard extends StatefulWidget {
   final MatchStats stats;
   const _ScoreCard({required this.stats});
+  @override
+  State<_ScoreCard> createState() => _ScoreCardState();
+}
+
+class _ScoreCardState extends State<_ScoreCard> {
+  final TextEditingController _redName = TextEditingController();
+  final TextEditingController _blueName = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final lang = context.read<SettingsProvider>().lang;
+    _redName.text = lang == 'tr' ? 'Kırmızı' : 'Red';
+    _blueName.text = lang == 'tr' ? 'Mavi' : 'Blue';
+  }
+
+  @override
+  void dispose() {
+    _redName.dispose();
+    _blueName.dispose();
+    super.dispose();
+  }
+
+  Widget _ledSeparator(Color color) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: List.generate(
+      3,
+      (i) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        width: 18,
+        height: 2.5,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(2),
+          boxShadow: [BoxShadow(color: color.withOpacity(0.6), blurRadius: 6)],
+        ),
+      ),
+    ),
+  );
+
+  Widget _editableName(TextEditingController ctrl, Color color) => SizedBox(
+    width: 90,
+    child: TextField(
+      controller: ctrl,
+      textAlign: TextAlign.center,
+      style: GoogleFonts.inter(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: color,
+        letterSpacing: 1,
+        decoration: TextDecoration.none,
+      ),
+      decoration: const InputDecoration(
+        isDense: true,
+        border: InputBorder.none,
+        contentPadding: EdgeInsets.zero,
+      ),
+      onChanged: (_) => setState(() {}),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) => GlassCard(
-    child: Column(
-      children: [
-        const SectionLabel('Score'),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _TeamScoreBlock(
-              name: context.read<SettingsProvider>().lang == 'tr'
-                  ? 'Kırmızı'
-                  : 'Red',
-              score: stats.redTeam.score,
-              color: const Color(0xFFFF4D6A),
-              players: stats.redTeam.players,
-            ),
-            Text(
-              '–',
-              style: GoogleFonts.inter(
-                fontSize: 32,
-                fontWeight: FontWeight.w300,
-                color: AppTheme.textHintOf(context),
-                decoration: TextDecoration.none,
+    child: Material(
+      type: MaterialType.transparency,
+      child: Column(
+        children: [
+          const SectionLabel('Score'),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _TeamScoreBlock(
+                nameWidget: Column(
+                  children: [
+                    _ledSeparator(const Color(0xFFFF4D6A)),
+                    const SizedBox(height: 6),
+                    _editableName(_redName, const Color(0xFFFF4D6A)),
+                  ],
+                ),
+                score: widget.stats.redTeam.score,
+                color: const Color(0xFFFF4D6A),
+                players: widget.stats.redTeam.players,
               ),
-            ),
-            _TeamScoreBlock(
-              name: context.read<SettingsProvider>().lang == 'tr'
-                  ? 'Mavi'
-                  : 'Blue',
-              score: stats.blueTeam.score,
-              color: const Color(0xFF4A9EFF),
-              players: stats.blueTeam.players,
-            ),
-          ],
-        ),
-      ],
+              Text(
+                '–',
+                style: GoogleFonts.inter(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w300,
+                  color: AppTheme.textHintOf(context),
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              _TeamScoreBlock(
+                nameWidget: Column(
+                  children: [
+                    _ledSeparator(const Color(0xFF4A9EFF)),
+                    const SizedBox(height: 6),
+                    _editableName(_blueName, const Color(0xFF4A9EFF)),
+                  ],
+                ),
+                score: widget.stats.blueTeam.score,
+                color: const Color(0xFF4A9EFF),
+                players: widget.stats.blueTeam.players,
+              ),
+            ],
+          ),
+        ],
+      ),
     ),
   );
 }
 
 class _TeamScoreBlock extends StatelessWidget {
-  final String name;
+  final Widget nameWidget;
   final int score;
   final Color color;
   final List<String> players;
   const _TeamScoreBlock({
-    required this.name,
+    required this.nameWidget,
     required this.score,
     required this.color,
     required this.players,
@@ -499,16 +594,7 @@ class _TeamScoreBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      Text(
-        name,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: color,
-          letterSpacing: 1,
-          decoration: TextDecoration.none,
-        ),
-      ),
+      nameWidget,
       const SizedBox(height: 4),
       Text(
         '$score',
@@ -992,10 +1078,22 @@ class _PlayerTable extends StatefulWidget {
 class _PlayerTableState extends State<_PlayerTable> {
   String _sortBy = 'goals';
   bool _ascending = false;
+  // 0 = All (original order), 1 = Red first, 2 = Blue first
+  int _teamFilter = 0;
 
   List<PlayerStat> get _sorted {
     final list = List<PlayerStat>.from(widget.stats.playerStats);
     list.sort((a, b) {
+      // Team grouping first when filter is active
+      if (_teamFilter == 1) {
+        final ta = a.team == 1 ? 0 : 1;
+        final tb = b.team == 1 ? 0 : 1;
+        if (ta != tb) return ta.compareTo(tb);
+      } else if (_teamFilter == 2) {
+        final ta = a.team == 2 ? 0 : 1;
+        final tb = b.team == 2 ? 0 : 1;
+        if (ta != tb) return ta.compareTo(tb);
+      }
       int r;
       switch (_sortBy) {
         case 'goals':
@@ -1031,7 +1129,33 @@ class _PlayerTableState extends State<_PlayerTable> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionLabel('Player Statistics'),
+        Row(
+          children: [
+            const SectionLabel('Player Statistics'),
+            const Spacer(),
+            // Team filter: All / Red ↑ / Blue ↑
+            _TeamFilterChip(
+              label: 'All',
+              active: _teamFilter == 0,
+              color: AppTheme.textHint,
+              onTap: () => setState(() => _teamFilter = 0),
+            ),
+            const SizedBox(width: 6),
+            _TeamFilterChip(
+              label: 'Red ↑',
+              active: _teamFilter == 1,
+              color: const Color(0xFFFF4D6A),
+              onTap: () => setState(() => _teamFilter = 1),
+            ),
+            const SizedBox(width: 6),
+            _TeamFilterChip(
+              label: 'Blue ↑',
+              active: _teamFilter == 2,
+              color: const Color(0xFF4A9EFF),
+              onTap: () => setState(() => _teamFilter = 2),
+            ),
+          ],
+        ),
         const SizedBox(height: 14),
         // Header
         _TableHeader(sortBy: _sortBy, ascending: _ascending, onSort: _sort),
@@ -1247,4 +1371,112 @@ class _Stat extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _TeamFilterChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final Color color;
+  final VoidCallback onTap;
+  const _TeamFilterChip({
+    required this.label,
+    required this.active,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: active ? color.withOpacity(0.15) : Colors.transparent,
+        border: Border.all(
+          color: active ? color : AppTheme.borderOf(context),
+          width: active ? 1.5 : 1,
+        ),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+          color: active ? color : AppTheme.textHintOf(context),
+          decoration: TextDecoration.none,
+        ),
+      ),
+    ),
+  );
+}
+
+class _LedButton extends StatefulWidget {
+  const _LedButton({
+    required this.label,
+    required this.icon,
+    required this.gradient,
+    required this.borderColor,
+    required this.glowColor,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final LinearGradient gradient;
+  final Color borderColor;
+  final Color glowColor;
+  final VoidCallback onPressed;
+
+  @override
+  State<_LedButton> createState() => _LedButtonState();
+}
+
+class _LedButtonState extends State<_LedButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          decoration: BoxDecoration(
+            gradient: widget.gradient,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: widget.borderColor, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: widget.glowColor,
+                blurRadius: _hovered ? 16 : 8,
+                spreadRadius: _hovered ? 2 : 0,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon, color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Text(
+                widget.label,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

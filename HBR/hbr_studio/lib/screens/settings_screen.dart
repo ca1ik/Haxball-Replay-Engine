@@ -331,14 +331,6 @@ class _PerformanceCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        _ToggleRow(
-          label: l10n.t('settings.fps'),
-          sublabel: 'Targets system refresh rate up to 360Hz',
-          value: settings.highRefreshRate,
-          onChanged: settings.setHighRefreshRate,
-          color: AppTheme.accent,
-        ),
-        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
