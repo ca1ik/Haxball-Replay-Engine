@@ -838,31 +838,56 @@ class _SplitScreenState extends State<SplitScreen> {
     ],
   );
 
+  static const _guideSteps = [
+    (
+      AppTheme.purple,
+      'Drop your .hbr2 file',
+      'Drag a single replay file onto the left panel. The app reads total frame count and duration — no guessing needed.',
+    ),
+    (
+      AppTheme.accent,
+      'Set the split point',
+      'Enter MM:SS in the time field or drag the timeline divider. At 60 fps, "45:00" maps to frame 162,000 exactly.',
+    ),
+    (
+      Color(0xFF4A6CF7),
+      'Pick output folder',
+      'Set where to save Part 1 and Part 2. Defaults to your Downloads folder.',
+    ),
+    (
+      Color(0xFFFF8C42),
+      'Click Split Replay',
+      'Events are partitioned at the split frame. Part 2 frame numbers are re-offset to start at 0. Both files are valid standalone HBR2 replays.',
+    ),
+  ];
+
   Widget _buildRightPanel() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const SectionLabel('Output Log'),
+      GradientSectionLabel(_logLines.isNotEmpty ? 'Output Log' : 'Process Steps'),
       const SizedBox(height: 8),
-      Expanded(
-        child: GlassCard(
-          padding: const EdgeInsets.all(16),
-          child: _logLines.isEmpty
-              ? _buildIdleInfo()
-              : ListView.builder(
-                  itemCount: _logLines.length,
-                  itemBuilder: (_, i) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Text(
-                      _logLines[i],
-                      style: GoogleFonts.robotoMono(
-                        fontSize: context.rfs(13),
-                        color: AppTheme.textSec,
-                      ),
-                    ),
-                  ),
-                ),
+      if (_logLines.isNotEmpty)
+        GlassCard(
+          padding: const EdgeInsets.all(14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 260, minHeight: 60),
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const ClampingScrollPhysics(),
+              itemCount: _logLines.length,
+              itemBuilder: (_, i) => LogLine(_logLines[i]),
+            ),
+          ),
+        )
+      else
+        ..._guideSteps.asMap().entries.map(
+          (e) => StepCard(
+            index: e.key + 1,
+            title: e.value.$2,
+            description: e.value.$3,
+            color: e.value.$1,
+          ),
         ),
-      ),
       const SizedBox(height: 16),
       if (_running || _progress > 0) _buildProgressBar(),
       if (_resultMessage != null) ...[
@@ -945,84 +970,6 @@ class _SplitScreenState extends State<SplitScreen> {
           ],
         ),
       ).animate().fadeIn(duration: 250.ms),
-    );
-  }
-
-  Widget _buildIdleInfo() {
-    final items = [
-      (
-        Icons.content_cut_rounded,
-        AppTheme.purple,
-        'How Split Works',
-        'Events with frameNo ≤ splitFrame go to Part 1; the rest to Part 2. Part 2 frame numbers are re-offset to start at 0.',
-      ),
-      (
-        Icons.sports_soccer_rounded,
-        AppTheme.accent,
-        'Preserve Room State',
-        'Both parts share the original room state — stadium, teams, player names — so each is a valid standalone .hbr2 file.',
-      ),
-      (
-        Icons.timer_rounded,
-        const Color(0xFF4A6CF7),
-        'Frame-Accurate Timing',
-        'haxball.com records at ~60 fps. Enter MM:SS and the app converts to exact frame number (time × 60), then writes the boundary.',
-      ),
-      (
-        Icons.merge_type_rounded,
-        const Color(0xFFFF8C42),
-        'Re-Merge Anytime',
-        'Split parts are fully compatible with the Merge tool. Reorder or re-combine them to create highlight reels or match reviews.',
-      ),
-    ];
-    return ListView.separated(
-      padding: EdgeInsets.zero,
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        final item = items[i];
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: item.$2.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(item.$1, size: 14, color: item.$2),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.$3,
-                    style: GoogleFonts.inter(
-                      fontSize: context.rfs(13),
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimOf(context),
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.$4,
-                    style: GoogleFonts.inter(
-                      fontSize: context.rfs(12),
-                      color: AppTheme.textSecOf(context),
-                      height: 1.45,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 

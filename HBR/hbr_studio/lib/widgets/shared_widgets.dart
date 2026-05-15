@@ -175,6 +175,177 @@ class SectionLabel extends StatelessWidget {
   );
 }
 
+/// Section label with a purple → indigo gradient shimmer effect.
+class GradientSectionLabel extends StatelessWidget {
+  final String text;
+  final LinearGradient? gradient;
+  const GradientSectionLabel(this.text, {super.key, this.gradient});
+
+  @override
+  Widget build(BuildContext context) => ShaderMask(
+        blendMode: BlendMode.srcIn,
+        shaderCallback: (bounds) => (gradient ?? AppTheme.purpleGrad)
+            .createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+        child: Text(
+          text.toUpperCase(),
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            letterSpacing: 1.4,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      );
+}
+
+/// Numbered step card — same design as Guide screen Process Steps.
+class StepCard extends StatelessWidget {
+  final int index;
+  final String title;
+  final String description;
+  final Color color;
+
+  const StepCard({
+    super.key,
+    required this.index,
+    required this.title,
+    required this.description,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: AppTheme.surface,
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Center(
+                  child: Text(
+                    '$index',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: context.rfs(12),
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimOf(context),
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      description,
+                      style: GoogleFonts.inter(
+                        fontSize: context.rfs(11),
+                        color: AppTheme.textSecOf(context),
+                        height: 1.4,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+/// Modern color-coded log entry with icon + Fira Code font.
+class LogLine extends StatelessWidget {
+  final String text;
+  const LogLine(this.text, {super.key});
+
+  Color _color() {
+    final l = text.toLowerCase();
+    if (l.contains('error') || l.contains('fail') || l.contains('✗'))
+      return const Color(0xFFFF4D6A);
+    if (l.contains('success') ||
+        l.contains('saved') ||
+        l.contains('done') ||
+        l.contains('complete') ||
+        l.contains('✓'))
+      return const Color(0xFF00D4AA);
+    if (l.contains('warning') || l.contains('warn'))
+      return const Color(0xFFFFB347);
+    if (l.contains('%') ||
+        l.contains('frame') ||
+        l.contains('progress') ||
+        l.contains('reading') ||
+        l.contains('writing'))
+      return const Color(0xFF4A6CF7);
+    return const Color(0xFF8B9DC3);
+  }
+
+  IconData _icon() {
+    final l = text.toLowerCase();
+    if (l.contains('error') || l.contains('fail') || l.contains('✗'))
+      return Icons.error_outline_rounded;
+    if (l.contains('success') ||
+        l.contains('saved') ||
+        l.contains('done') ||
+        l.contains('complete') ||
+        l.contains('✓'))
+      return Icons.check_circle_outline_rounded;
+    if (l.contains('%') || l.contains('frame') || l.contains('progress'))
+      return Icons.data_usage_rounded;
+    return Icons.chevron_right_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2.5),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 1.5),
+              child: Icon(_icon(), size: 12, color: _color()),
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                text,
+                style: GoogleFonts.firaCode(
+                  fontSize: context.rfs(11.5),
+                  color: _color(),
+                  height: 1.4,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
 class StatusBadge extends StatelessWidget {
   final String label;
   final Color color;

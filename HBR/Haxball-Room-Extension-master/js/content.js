@@ -553,6 +553,376 @@ init.then(function(value) {
 
 
 const TRANSLATE_API = "https://private-api-mkab.onrender.com/haxball/translate";
+
+// ── HBR Studio: Viewer Enhancements ──────────────────────────────────────────
+// Inject CSS that hides haxball.com top navigation bar (header) so the game
+// view fills the full viewport — press Alt+H to toggle it back.
+(function hbrInjectViewerStyles() {
+	var style = document.createElement('style');
+	style.id = 'hbr-viewer-style';
+	style.textContent = [
+		'/* HBR Studio – hide top nav for cleaner replay/game view */',
+		'header, nav, [class*="top-nav"], [class*="main-nav"],',
+		'[class*="nav-bar"], [class*="header-nav"],',
+		'body > div:first-of-type > header, body > header {',
+		'  display: none !important;',
+		'}',
+		'.gameframe {',
+		'  top: 0 !important;',
+		'  height: 100vh !important;',
+		'}',
+	].join('\n');
+	if (document.head) {
+		document.head.appendChild(style);
+	} else {
+		document.addEventListener('DOMContentLoaded', function () {
+			document.head.appendChild(style);
+		});
+	}
+
+	// Alt+H toggles the header hide on/off
+	document.addEventListener('keydown', function (e) {
+		if (e.altKey && e.key === 'h') {
+			var s = document.getElementById('hbr-viewer-style');
+			if (s) s.disabled = !s.disabled;
+		}
+	});
+})();
+
+// ── HBR Studio: Full Viewer Toolbar ──────────────────────────────────────────
+
+var _hbrClipIn  = -1;
+var _hbrClipOut = -1;
+var _hbrGoalLog = [];
+
+function _hbrParseTime(str) {
+	if (!str) return 0;
+	var p = str.trim().split(':').map(Number);
+	if (p.length === 2) return p[0] * 60 + p[1];
+	if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+	return 0;
+}
+
+function _hbrFmtTime(sec) {
+	var m = Math.floor(sec / 60);
+	var s = sec % 60;
+	return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// Scan iframe DOM for a MM:SS time display (replay progress indicator)
+function _hbrGetCurrentTime(iDoc) {
+	var nodes = iDoc.querySelectorAll('span, div, td, p');
+	for (var i = 0; i < nodes.length; i++) {
+		var el = nodes[i];
+		if (el.children.length !== 0) continue;
+		var t = el.textContent.trim();
+		if (/^\d{1,2}:\d{2}$/.test(t)) return t;
+	}
+	return null;
+}
+
+// Parse in-game chat/notice log for goal events
+function _hbrScanGoals(iDoc) {
+	_hbrGoalLog = [];
+	var logEl = iDoc.querySelector('[data-hook="log"]');
+	if (!logEl) return;
+	logEl.querySelectorAll('*').forEach(function (el) {
+		if (el.children.length !== 0) return;
+		var txt = el.textContent.trim().toLowerCase();
+		if (txt.indexOf('goal') !== -1 || txt.indexOf('gol') !== -1) {
+			_hbrGoalLog.push({
+				time : _hbrGetCurrentTime(iDoc) || '?:??',
+				text : el.textContent.trim().substring(0, 48),
+			});
+		}
+	});
+}
+
+// Main toolbar injection — idempotent, safe to call multiple times
+function _hbrInjectToolbar(iDoc) {
+	if (!iDoc || !iDoc.body || iDoc.getElementById('hbr-wrap')) return;
+
+	// ── Styles ──────────────────────────────────────────────────────────────
+	var styleEl = iDoc.createElement('style');
+	styleEl.id  = 'hbr-studio-css';
+	styleEl.textContent =
+		'#hbr-wrap * { box-sizing:border-box; font-family:"Inter","Segoe UI",sans-serif; }' +
+		'#hbr-toolbar {' +
+		'  position:fixed; bottom:40px; left:0; right:0; height:44px;' +
+		'  background:rgba(8,10,20,0.96);' +
+		'  border-top:1px solid rgba(123,94,167,0.35);' +
+		'  display:flex; align-items:center; gap:5px; padding:0 10px;' +
+		'  z-index:99990; backdrop-filter:blur(12px);' +
+		'}' +
+		'.hbr-btn {' +
+		'  background:rgba(255,255,255,0.06); color:#9aa5bd;' +
+		'  border:1px solid rgba(255,255,255,0.1); border-radius:6px;' +
+		'  padding:3px 9px; font-size:11px; cursor:pointer; white-space:nowrap;' +
+		'  transition:all .15s; line-height:1.5;' +
+		'}' +
+		'.hbr-btn:hover { background:rgba(123,94,167,0.22); color:#c8b4ff; border-color:rgba(123,94,167,0.5); }' +
+		'.hbr-pri  { color:#9d7fd4; border-color:rgba(123,94,167,0.4); }' +
+		'.hbr-acc  { color:#00c9a7; border-color:rgba(0,201,167,0.4); }' +
+		'.hbr-on   { background:rgba(123,94,167,0.2); color:#c8b4ff; border-color:rgba(123,94,167,0.5); }' +
+		'.hbr-off  { color:#ff4d6a!important; border-color:rgba(255,77,106,0.4)!important; }' +
+		'.hbr-time { font-size:11px; color:#4f5b75; min-width:36px; text-align:center; font-variant-numeric:tabular-nums; }' +
+		'.hbr-inp  { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#c0c8e0; padding:3px 8px; font-size:11px; width:110px; outline:none; }' +
+		'.hbr-sep  { width:1px; height:22px; background:rgba(255,255,255,0.1); margin:0 2px; flex-shrink:0; }' +
+		/* Stats overlay */
+		'#hbr-stats { position:fixed; top:48px; left:10px; background:rgba(8,10,20,0.92); border:1px solid rgba(123,94,167,0.4); border-radius:12px; padding:14px 16px; min-width:175px; z-index:99989; display:none; backdrop-filter:blur(14px); color:#b0bcd8; font-size:12px; line-height:1.6; }' +
+		'#hbr-stats.hbr-vis { display:block; }' +
+		'#hbr-stats h4 { margin:0 0 8px; font-size:10px; color:#7b5ea7; letter-spacing:1.2px; text-transform:uppercase; }' +
+		/* Goal popup */
+		'#hbr-goal-popup { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(8,10,20,0.96); border:1px solid rgba(123,94,167,0.4); border-radius:14px; padding:18px 20px; min-width:240px; max-width:320px; z-index:99991; display:none; backdrop-filter:blur(16px); color:#b0bcd8; }' +
+		'#hbr-goal-popup.hbr-vis { display:block; }' +
+		'#hbr-goal-popup h4 { margin:0 0 10px; font-size:10px; color:#7b5ea7; letter-spacing:1.2px; text-transform:uppercase; }' +
+		'.hbr-goal-row { padding:7px 10px; margin-bottom:5px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; cursor:pointer; font-size:12px; }' +
+		'.hbr-goal-row:hover { background:rgba(123,94,167,0.18); border-color:rgba(123,94,167,0.4); }' +
+		/* Chatbot */
+		'#hbr-cb-toggle { position:fixed; bottom:90px; left:12px; width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#7b5ea7,#4a6cf7); display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:99990; font-size:17px; box-shadow:0 4px 16px rgba(123,94,167,0.45); transition:transform .18s; }' +
+		'#hbr-cb-toggle:hover { transform:scale(1.1); }' +
+		'#hbr-cb-panel { position:fixed; bottom:138px; left:12px; width:282px; height:336px; background:rgba(8,10,20,0.96); border:1px solid rgba(123,94,167,0.4); border-radius:14px; flex-direction:column; display:none; z-index:99990; backdrop-filter:blur(16px); overflow:hidden; }' +
+		'#hbr-cb-panel.hbr-open { display:flex; }' +
+		'#hbr-cb-head { padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.08); font-size:12px; color:#c8b4ff; font-weight:600; display:flex; align-items:center; gap:8px; }' +
+		'#hbr-cb-msgs { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px; scrollbar-width:thin; scrollbar-color:rgba(123,94,167,0.4) transparent; }' +
+		'.hbr-msg { font-size:11px; padding:6px 9px; border-radius:8px; max-width:90%; line-height:1.45; white-space:pre-wrap; }' +
+		'.hbr-msg-bot  { background:rgba(123,94,167,0.16); color:#b8c8e0; align-self:flex-start; }' +
+		'.hbr-msg-user { background:rgba(74,108,247,0.18); color:#a0b0e0; align-self:flex-end; }' +
+		'#hbr-cb-row { padding:8px 10px; border-top:1px solid rgba(255,255,255,0.08); display:flex; gap:6px; }' +
+		'#hbr-cb-input { flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:#c0c8e0; padding:5px 9px; font-size:11px; outline:none; }' +
+		'#hbr-cb-send  { background:rgba(123,94,167,0.28); border:1px solid rgba(123,94,167,0.5); border-radius:8px; color:#c8b4ff; padding:5px 10px; font-size:12px; cursor:pointer; }' +
+		/* Toast */
+		'#hbr-toast { position:fixed; bottom:90px; right:14px; background:rgba(0,201,167,0.14); border:1px solid rgba(0,201,167,0.4); color:#00c9a7; border-radius:8px; padding:7px 13px; font-size:11px; z-index:99999; display:none; max-width:260px; line-height:1.4; }' +
+		'#hbr-toast.hbr-err { background:rgba(255,77,106,0.14)!important; border-color:rgba(255,77,106,0.4)!important; color:#ff4d6a!important; }' +
+		'#hbr-toast.hbr-vis { display:block; }';
+
+	(iDoc.head || iDoc.documentElement).appendChild(styleEl);
+
+	// ── HTML ────────────────────────────────────────────────────────────────
+	var wrap = iDoc.createElement('div');
+	wrap.id = 'hbr-wrap';
+	wrap.innerHTML =
+		'<div id="hbr-toolbar">' +
+			'<button class="hbr-btn hbr-pri" id="hbr-set-in"  title="Set clip IN at current time">&#x22C4; IN</button>' +
+			'<span   class="hbr-time" id="hbr-t-in">--:--</span>' +
+			'<button class="hbr-btn hbr-pri" id="hbr-set-out" title="Set clip OUT at current time">&#x22C4; OUT</button>' +
+			'<span   class="hbr-time" id="hbr-t-out">--:--</span>' +
+			'<input  type="text" class="hbr-inp" id="hbr-clip-name" placeholder="clip name\u2026" />' +
+			'<button class="hbr-btn hbr-acc" id="hbr-copy" title="Copy clip info to clipboard">\uD83D\uDCCB Copy</button>' +
+			'<div class="hbr-sep"></div>' +
+			'<button class="hbr-btn" id="hbr-goal-btn"  title="Show detected goals">\u26BD Goals</button>' +
+			'<button class="hbr-btn" id="hbr-stats-btn" title="Toggle stats overlay">\uD83D\uDCCA Stats</button>' +
+			'<div style="flex:1"></div>' +
+			'<button class="hbr-btn hbr-on" id="hbr-menu-btn"  title="Toggle sidebar menu">\u2630 Menu</button>' +
+			'<button class="hbr-btn hbr-on" id="hbr-score-btn" title="Toggle score display">\u23F1 Score</button>' +
+		'</div>' +
+
+		'<div id="hbr-stats"><h4>\uD83D\uDCCA HBR Stats</h4><div id="hbr-stats-body">\u2014</div></div>' +
+
+		'<div id="hbr-goal-popup">' +
+			'<h4>\u26BD Select a Goal</h4>' +
+			'<div id="hbr-goal-list"><p style="font-size:11px;color:#4f5b75">No goals in the log yet.</p></div>' +
+			'<button class="hbr-btn" id="hbr-goal-close" style="margin-top:10px;width:100%">Close</button>' +
+		'</div>' +
+
+		'<div id="hbr-cb-toggle" title="HBR Assistant">\uD83E\uDD16</div>' +
+		'<div id="hbr-cb-panel">' +
+			'<div id="hbr-cb-head">\uD83E\uDD16 HBR Assistant</div>' +
+			'<div id="hbr-cb-msgs">' +
+				'<div class="hbr-msg hbr-msg-bot">Hi! I\u2019m your HBR Assistant.\nTry: help \u00B7 stats \u00B7 goals \u00B7 current time \u00B7 how to clip \u00B7 clip from 1:00 to 2:30</div>' +
+			'</div>' +
+			'<div id="hbr-cb-row">' +
+				'<input type="text" id="hbr-cb-input" placeholder="Ask anything\u2026" />' +
+				'<button id="hbr-cb-send">\u25B6</button>' +
+			'</div>' +
+		'</div>' +
+
+		'<div id="hbr-toast"></div>';
+
+	iDoc.body.appendChild(wrap);
+
+	// ── Shortcuts ────────────────────────────────────────────────────────────
+	var tIn      = iDoc.getElementById('hbr-t-in');
+	var tOut     = iDoc.getElementById('hbr-t-out');
+	var statsBox = iDoc.getElementById('hbr-stats');
+	var statsBody= iDoc.getElementById('hbr-stats-body');
+	var goalPopup= iDoc.getElementById('hbr-goal-popup');
+	var goalList = iDoc.getElementById('hbr-goal-list');
+	var cbPanel  = iDoc.getElementById('hbr-cb-panel');
+	var cbMsgs   = iDoc.getElementById('hbr-cb-msgs');
+	var cbInput  = iDoc.getElementById('hbr-cb-input');
+	var toastEl  = iDoc.getElementById('hbr-toast');
+	var _toastTm;
+
+	function toast(msg, isErr, dur) {
+		clearTimeout(_toastTm);
+		toastEl.textContent = msg;
+		toastEl.className = 'hbr-vis' + (isErr ? ' hbr-err' : '');
+		_toastTm = setTimeout(function () { toastEl.className = ''; }, dur || 3200);
+	}
+	function $id(id) { return iDoc.getElementById(id); }
+
+	// ── Clip Creator ─────────────────────────────────────────────────────────
+	$id('hbr-set-in').addEventListener('click', function () {
+		var t = _hbrGetCurrentTime(iDoc);
+		if (!t) { toast('Could not read current time', true); return; }
+		_hbrClipIn = _hbrParseTime(t);
+		tIn.textContent = t; tIn.style.color = '#9d7fd4';
+		toast('IN point set at ' + t);
+	});
+
+	$id('hbr-set-out').addEventListener('click', function () {
+		var t = _hbrGetCurrentTime(iDoc);
+		if (!t) { toast('Could not read current time', true); return; }
+		_hbrClipOut = _hbrParseTime(t);
+		tOut.textContent = t; tOut.style.color = '#00c9a7';
+		toast('OUT point set at ' + t);
+	});
+
+	$id('hbr-copy').addEventListener('click', function () {
+		if (_hbrClipIn < 0 || _hbrClipOut <= _hbrClipIn) {
+			toast('Set a valid IN point before OUT', true); return;
+		}
+		var name = $id('hbr-clip-name').value.trim() || 'clip';
+		var txt  =
+			'HBR Clip: ' + name + '\n' +
+			'IN:  ' + _hbrFmtTime(_hbrClipIn)  + '  (frame ~' + (_hbrClipIn  * 60) + ')\n' +
+			'OUT: ' + _hbrFmtTime(_hbrClipOut) + '  (frame ~' + (_hbrClipOut * 60) + ')\n' +
+			'Dur: ' + _hbrFmtTime(_hbrClipOut - _hbrClipIn) + '\n' +
+			'\u2192 Open HBR Studio \u203A Split to extract.';
+		try {
+			(iDoc.defaultView || window).navigator.clipboard
+				.writeText(txt)
+				.then(function () { toast('Copied! Open HBR Studio \u203A Split to save.'); });
+		} catch (e) {
+			toast('IN=' + _hbrFmtTime(_hbrClipIn) + ' OUT=' + _hbrFmtTime(_hbrClipOut), false, 5000);
+		}
+	});
+
+	// ── Goal Clip ────────────────────────────────────────────────────────────
+	$id('hbr-goal-btn').addEventListener('click', function () {
+		_hbrScanGoals(iDoc);
+		if (_hbrGoalLog.length === 0) {
+			goalList.innerHTML = '<p style="font-size:11px;color:#4f5b75">No goal events in the log yet.</p>';
+		} else {
+			goalList.innerHTML = _hbrGoalLog.map(function (g, i) {
+				return '<div class="hbr-goal-row" data-i="' + i + '">' +
+					'Goal ' + (i + 1) + ' &nbsp;&middot;&nbsp; <strong>' + g.time + '</strong>' +
+					'<div style="font-size:10px;color:#4f5b75;margin-top:2px">' + g.text + '</div>' +
+					'</div>';
+			}).join('');
+			goalList.querySelectorAll('.hbr-goal-row').forEach(function (row) {
+				row.addEventListener('click', function () {
+					var g = _hbrGoalLog[parseInt(row.dataset.i)];
+					var s = _hbrParseTime(g.time);
+					_hbrClipIn  = Math.max(0, s - 15);
+					_hbrClipOut = s + 3;
+					tIn.textContent  = _hbrFmtTime(_hbrClipIn);  tIn.style.color  = '#9d7fd4';
+					tOut.textContent = _hbrFmtTime(_hbrClipOut); tOut.style.color = '#00c9a7';
+					goalPopup.classList.remove('hbr-vis');
+					toast('Goal clip: ' + _hbrFmtTime(_hbrClipIn) + ' \u2192 ' + _hbrFmtTime(_hbrClipOut));
+				});
+			});
+		}
+		goalPopup.classList.toggle('hbr-vis');
+	});
+	$id('hbr-goal-close').addEventListener('click', function () { goalPopup.classList.remove('hbr-vis'); });
+
+	// ── Stats ────────────────────────────────────────────────────────────────
+	$id('hbr-stats-btn').addEventListener('click', function () {
+		var t  = _hbrGetCurrentTime(iDoc) || '\u2014';
+		var sc = iDoc.querySelector('[class*="score"],[class*="Score"]');
+		statsBody.innerHTML =
+			'<div><span style="color:#4f5b75">Time: </span><strong>' + t + '</strong></div>' +
+			'<div><span style="color:#4f5b75">Score:</span><strong> ' + (sc ? sc.textContent.trim() : '\u2014') + '</strong></div>' +
+			'<div style="margin-top:6px"><span style="color:#4f5b75">Clip IN: </span>' + (_hbrClipIn  >= 0 ? _hbrFmtTime(_hbrClipIn)  : 'not set') + '</div>' +
+			'<div><span style="color:#4f5b75">Clip OUT:</span> ' + (_hbrClipOut >= 0 ? _hbrFmtTime(_hbrClipOut) : 'not set') + '</div>';
+		statsBox.classList.toggle('hbr-vis');
+	});
+
+	// ── Menu / Score toggles ─────────────────────────────────────────────────
+	$id('hbr-menu-btn').addEventListener('click', function () {
+		var b  = $id('hbr-menu-btn');
+		var on = b.classList.contains('hbr-on');
+		var el = iDoc.querySelector('[data-hook="menu"]');
+		if (el) { (el.closest('[class]') || el).style.display = on ? 'none' : ''; }
+		b.classList.toggle('hbr-on', !on);
+		b.classList.toggle('hbr-off', on);
+	});
+
+	$id('hbr-score-btn').addEventListener('click', function () {
+		var b  = $id('hbr-score-btn');
+		var on = b.classList.contains('hbr-on');
+		var el = iDoc.querySelector('[class*="score"],[class*="Score"]');
+		if (el) el.style.display = on ? 'none' : '';
+		b.classList.toggle('hbr-on', !on);
+		b.classList.toggle('hbr-off', on);
+	});
+
+	// ── Chatbot ──────────────────────────────────────────────────────────────
+	$id('hbr-cb-toggle').addEventListener('click', function () { cbPanel.classList.toggle('hbr-open'); });
+
+	function addMsg(text, isUser) {
+		var el = iDoc.createElement('div');
+		el.className = 'hbr-msg ' + (isUser ? 'hbr-msg-user' : 'hbr-msg-bot');
+		el.textContent = text;
+		cbMsgs.appendChild(el);
+		cbMsgs.scrollTop = cbMsgs.scrollHeight;
+	}
+
+	function cbReply(q) {
+		var lq = q.toLowerCase().trim();
+		if (lq === 'help') return 'Commands:\n\u00B7 stats \u2014 stats overlay\n\u00B7 goals \u2014 goal list\n\u00B7 current time\n\u00B7 how to clip\n\u00B7 clip from M:SS to M:SS\n\u00B7 clear \u2014 reset IN/OUT';
+		if (lq === 'stats') { $id('hbr-stats-btn').click(); return 'Stats overlay toggled.'; }
+		if (lq === 'goals') { $id('hbr-goal-btn').click();  return 'Goal list opened.'; }
+		if (lq === 'current time') { var t2 = _hbrGetCurrentTime(iDoc); return t2 ? 'Current time: ' + t2 : 'Could not read time.'; }
+		if (lq === 'clear') {
+			_hbrClipIn = _hbrClipOut = -1;
+			tIn.textContent = tOut.textContent = '--:--';
+			tIn.style.color = tOut.style.color = '';
+			return 'Markers cleared.';
+		}
+		if (lq === 'how to clip') return '1. Play to clip start\n2. Click \u22C4 IN\n3. Play to clip end\n4. Click \u22C4 OUT\n5. Name it \u2192 \uD83D\uDCCB Copy\n6. Open HBR Studio \u203A Split';
+		var m = lq.match(/clip from (\d+:\d+)\s+to\s+(\d+:\d+)/);
+		if (m) {
+			_hbrClipIn  = _hbrParseTime(m[1]);
+			_hbrClipOut = _hbrParseTime(m[2]);
+			tIn.textContent  = m[1]; tIn.style.color  = '#9d7fd4';
+			tOut.textContent = m[2]; tOut.style.color = '#00c9a7';
+			return 'Clip set: ' + m[1] + ' \u2192 ' + m[2] + '\nClick \uD83D\uDCCB Copy to copy info.';
+		}
+		return 'I can help with clip timing and replay controls.\nType "help" for all commands.';
+	}
+
+	function cbSend() {
+		var v = cbInput.value.trim();
+		if (!v) return;
+		addMsg(v, true);
+		cbInput.value = '';
+		var r = cbReply(v);
+		setTimeout(function () { addMsg(r, false); }, 160);
+	}
+
+	$id('hbr-cb-send').addEventListener('click', cbSend);
+	cbInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') cbSend(); });
+}
+
+// Auto-inject toolbar whenever the gameframe is available
+(function () {
+	function tryInject() {
+		var gf = document.getElementsByClassName('gameframe')[0];
+		if (gf && gf.contentWindow && gf.contentWindow.document &&
+		    gf.contentWindow.document.body) {
+			_hbrInjectToolbar(gf.contentWindow.document);
+		}
+	}
+	var attempts = 0;
+	var iv = setInterval(function () {
+		tryInject();
+		if (++attempts >= 30) clearInterval(iv);
+	}, 500);
+})();
+
 function translate(text){
 	try {
 		var transalte_result = postData(TRANSLATE_API, {text: text});

@@ -546,31 +546,56 @@ class _MergeScreenState extends State<MergeScreen> {
     ],
   );
 
+  static const _guideSteps = [
+    (
+      AppTheme.accent,
+      'Drop your .hbr2 files',
+      'Drag two or more replay files onto the left panel. Each is parsed via node-haxball API — room state, frames and goal markers extracted.',
+    ),
+    (
+      AppTheme.purple,
+      'Order the files',
+      'File 1 plays first, File 2 continues right after — no gaps, no frame resets.',
+    ),
+    (
+      Color(0xFF4A6CF7),
+      'Pick output folder',
+      'Set where to save the merged file. Defaults to your Downloads folder.',
+    ),
+    (
+      Color(0xFFFF8C42),
+      'Click Merge Replays',
+      'Frame offsets recalculated, spawn order preserved, HBR2 binary written — fully compatible with haxball.com.',
+    ),
+  ];
+
   Widget _buildRightPanel() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const SectionLabel('Output Log'),
+      GradientSectionLabel(_logLines.isNotEmpty ? 'Output Log' : 'Process Steps'),
       const SizedBox(height: 8),
-      Expanded(
-        child: GlassCard(
-          padding: const EdgeInsets.all(16),
-          child: _logLines.isEmpty
-              ? _buildIdleInfo()
-              : ListView.builder(
-                  itemCount: _logLines.length,
-                  itemBuilder: (_, i) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Text(
-                      _logLines[i],
-                      style: GoogleFonts.robotoMono(
-                        fontSize: context.rfs(13),
-                        color: AppTheme.textSec,
-                      ),
-                    ),
-                  ),
-                ),
+      if (_logLines.isNotEmpty)
+        GlassCard(
+          padding: const EdgeInsets.all(14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 260, minHeight: 60),
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const ClampingScrollPhysics(),
+              itemCount: _logLines.length,
+              itemBuilder: (_, i) => LogLine(_logLines[i]),
+            ),
+          ),
+        )
+      else
+        ..._guideSteps.asMap().entries.map(
+          (e) => StepCard(
+            index: e.key + 1,
+            title: e.value.$2,
+            description: e.value.$3,
+            color: e.value.$1,
+          ),
         ),
-      ),
       const SizedBox(height: 16),
       if (_running || _progress > 0) _buildProgressBar(),
       if (_resultMessage != null) ...[
@@ -579,84 +604,6 @@ class _MergeScreenState extends State<MergeScreen> {
       ],
     ],
   ).animate().fadeIn(duration: 500.ms, delay: 200.ms);
-
-  Widget _buildIdleInfo() {
-    final items = [
-      (
-        Icons.layers_rounded,
-        AppTheme.accent,
-        'How Merge Works',
-        'Each .hbr2 file is parsed via node-haxball Replay API. Frame events are offset so File 2 continues exactly after File 1 — no divergence.',
-      ),
-      (
-        Icons.sync_rounded,
-        AppTheme.purple,
-        'Spawn Order Preserved',
-        'Team rosters are re-applied in the exact room order. This ensures physics determinism — the simulation runs identically when replayed.',
-      ),
-      (
-        Icons.compress_rounded,
-        const Color(0xFF4A6CF7),
-        'Binary Compatible',
-        'Output is standard HBR2 format: magic header + version byte + zlib-deflated payload. Works in haxball.com viewer instantly.',
-      ),
-      (
-        Icons.sports_soccer_rounded,
-        const Color(0xFFFF8C42),
-        'Typical Use Case',
-        'Merge 1st half + 2nd half recordings from the same match. Or combine multiple games into one training review session.',
-      ),
-    ];
-    return ListView.separated(
-      padding: EdgeInsets.zero,
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        final item = items[i];
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: item.$2.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(item.$1, size: 14, color: item.$2),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.$3,
-                    style: GoogleFonts.inter(
-                      fontSize: context.rfs(13),
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimOf(context),
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.$4,
-                    style: GoogleFonts.inter(
-                      fontSize: context.rfs(12),
-                      color: AppTheme.textSecOf(context),
-                      height: 1.45,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   Widget _buildProgressBar() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,

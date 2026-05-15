@@ -293,21 +293,23 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
     ],
   );
 
-  Widget _buildMergeSteps() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const SectionLabel('Process Steps'),
-      const SizedBox(height: 12),
-      ..._mergeSteps.asMap().entries.map(
-        (e) => _StepCard(
-          index: e.key + 1,
-          title: e.value.$1,
-          description: e.value.$2,
-          color: AppTheme.accent,
-          delay: e.key * 80,
+  Widget _buildMergeSteps() => SingleChildScrollView(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionLabel('Process Steps'),
+        const SizedBox(height: 12),
+        ..._mergeSteps.asMap().entries.map(
+          (e) => _StepCard(
+            index: e.key + 1,
+            title: e.value.$1,
+            description: e.value.$2,
+            color: AppTheme.accent,
+            delay: e.key * 80,
+          ),
         ),
-      ),
-    ],
+      ],
+    ),
   );
 
   static const _mergeSteps = [
@@ -592,21 +594,23 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
     );
   }
 
-  Widget _buildSplitSteps() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const SectionLabel('Process Steps'),
-      const SizedBox(height: 12),
-      ..._splitSteps.asMap().entries.map(
-        (e) => _StepCard(
-          index: e.key + 1,
-          title: e.value.$1,
-          description: e.value.$2,
-          color: AppTheme.purple,
-          delay: e.key * 80,
+  Widget _buildSplitSteps() => SingleChildScrollView(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionLabel('Process Steps'),
+        const SizedBox(height: 12),
+        ..._splitSteps.asMap().entries.map(
+          (e) => _StepCard(
+            index: e.key + 1,
+            title: e.value.$1,
+            description: e.value.$2,
+            color: AppTheme.purple,
+            delay: e.key * 80,
+          ),
         ),
-      ),
-    ],
+      ],
+    ),
   );
 
   static const _splitSteps = [
