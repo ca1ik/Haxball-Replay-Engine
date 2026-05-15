@@ -1,4 +1,5 @@
 // lib/main.dart
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +21,8 @@ import 'widgets/shared_widgets.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Enable pointer-event resampling for ultra-smooth 144/240/360Hz displays
+  GestureBinding.instance.resamplingEnabled = true;
   await windowManager.ensureInitialized();
 
   const options = WindowOptions(
@@ -61,6 +64,14 @@ class HbrStudioApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: settings.themeMode,
+      // Globally suppress text underlines inherited from Material defaults
+      builder: (context, child) => DefaultTextStyle.merge(
+        style: const TextStyle(
+          decoration: TextDecoration.none,
+          decorationColor: Colors.transparent,
+        ),
+        child: child!,
+      ),
       home: const AppShell(),
     );
   }

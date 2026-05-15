@@ -240,12 +240,17 @@ class _SplitScreenState extends State<SplitScreen> {
             style: GoogleFonts.inter(
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: AppTheme.textPrim,
+              color: AppTheme.textPrimOf(context),
+              decoration: TextDecoration.none,
             ),
           ),
           Text(
             'Cut a replay at any point in time into two separate files',
-            style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSec),
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppTheme.textSecOf(context),
+              decoration: TextDecoration.none,
+            ),
           ),
         ],
       ),
@@ -290,13 +295,15 @@ class _SplitScreenState extends State<SplitScreen> {
           borderRadius: BorderRadius.circular(16),
           color: _dragging
               ? AppTheme.purple.withOpacity(0.06)
-              : (_inputPath != null ? AppTheme.surface : AppTheme.surface),
+              : (_inputPath != null
+                    ? AppTheme.surfaceOf(context)
+                    : AppTheme.surfaceOf(context)),
           border: Border.all(
             color: _dragging
                 ? AppTheme.purple
                 : (_inputPath != null
                       ? AppTheme.purple.withOpacity(0.4)
-                      : AppTheme.border),
+                      : AppTheme.borderOf(context)),
             width: _dragging ? 2 : (_inputPath != null ? 1.5 : 1),
           ),
         ),
@@ -332,14 +339,16 @@ class _SplitScreenState extends State<SplitScreen> {
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
-                                  color: AppTheme.textPrim,
+                                  color: AppTheme.textPrimOf(context),
+                                  decoration: TextDecoration.none,
                                 ),
                               ),
                               Text(
                                 'Click to change file',
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
-                                  color: AppTheme.textHint,
+                                  color: AppTheme.textHintOf(context),
+                                  decoration: TextDecoration.none,
                                 ),
                               ),
                             ],
@@ -362,7 +371,10 @@ class _SplitScreenState extends State<SplitScreen> {
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: _dragging ? AppTheme.purple : AppTheme.textSec,
+                        color: _dragging
+                            ? AppTheme.purple
+                            : AppTheme.textSecOf(context),
+                        decoration: TextDecoration.none,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -370,7 +382,8 @@ class _SplitScreenState extends State<SplitScreen> {
                       'or click to browse',
                       style: GoogleFonts.inter(
                         fontSize: 11,
-                        color: AppTheme.textHint,
+                        color: AppTheme.textHintOf(context),
+                        decoration: TextDecoration.none,
                       ),
                     ),
                   ],
@@ -462,20 +475,25 @@ class _SplitScreenState extends State<SplitScreen> {
       style: GoogleFonts.inter(
         fontSize: 24,
         fontWeight: FontWeight.w700,
-        color: AppTheme.textPrim,
+        color: AppTheme.textPrimOf(context),
+        decoration: TextDecoration.none,
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.inter(fontSize: 10, color: AppTheme.textHint),
+        labelStyle: GoogleFonts.inter(
+          fontSize: 10,
+          color: AppTheme.textHintOf(context),
+          decoration: TextDecoration.none,
+        ),
         filled: true,
-        fillColor: AppTheme.surface,
+        fillColor: AppTheme.surfaceOf(context),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppTheme.border),
+          borderSide: BorderSide(color: AppTheme.borderOf(context)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppTheme.border),
+          borderSide: BorderSide(color: AppTheme.borderOf(context)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -709,26 +727,7 @@ class _SplitScreenState extends State<SplitScreen> {
         child: SizedBox(
           height: 260,
           child: _logLines.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.terminal_rounded,
-                        size: 32,
-                        color: AppTheme.textHint,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Output will appear here',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppTheme.textHint,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+              ? _buildIdleInfo()
               : ListView.builder(
                   itemCount: _logLines.length,
                   itemBuilder: (_, i) => Padding(
@@ -752,6 +751,84 @@ class _SplitScreenState extends State<SplitScreen> {
       ],
     ],
   ).animate().fadeIn(duration: 500.ms, delay: 200.ms);
+
+  Widget _buildIdleInfo() {
+    final items = [
+      (
+        Icons.content_cut_rounded,
+        AppTheme.purple,
+        'How Split Works',
+        'Events with frameNo ≤ splitFrame go to Part 1; the rest to Part 2. Part 2 frame numbers are re-offset to start at 0.',
+      ),
+      (
+        Icons.sports_soccer_rounded,
+        AppTheme.accent,
+        'Preserve Room State',
+        'Both parts share the original room state — stadium, teams, player names — so each is a valid standalone .hbr2 file.',
+      ),
+      (
+        Icons.timer_rounded,
+        const Color(0xFF4A6CF7),
+        'Frame-Accurate Timing',
+        'haxball.com records at ~60 fps. Enter MM:SS and the app converts to exact frame number (time × 60), then writes the boundary.',
+      ),
+      (
+        Icons.merge_type_rounded,
+        const Color(0xFFFF8C42),
+        'Re-Merge Anytime',
+        'Split parts are fully compatible with the Merge tool. Reorder or re-combine them to create highlight reels or match reviews.',
+      ),
+    ];
+    return ListView.separated(
+      padding: EdgeInsets.zero,
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, i) {
+        final item = items[i];
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: item.$2.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(item.$1, size: 14, color: item.$2),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.$3,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimOf(context),
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item.$4,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: AppTheme.textSecOf(context),
+                      height: 1.45,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Widget _buildProgressBar() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,

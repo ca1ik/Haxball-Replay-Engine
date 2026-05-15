@@ -266,34 +266,36 @@ class _AiChatWidgetState extends State<AiChatWidget>
       return isTr ? '0 gol kaydedildi.' : 'No goals recorded.';
     }
     final buf = StringBuffer();
-    buf.writeln(isTr ? '⚽ **Gol Kronolojisi**' : '⚽ **Goal Timeline**');
-    buf.writeln();
 
     // Group by team
     final redGoals = stats.goals.where((g) => g.scoringTeam == 1).toList();
     final blueGoals = stats.goals.where((g) => g.scoringTeam == 2).toList();
 
     buf.writeln(
-      '🔴 **${isTr ? "Kırmızı Takım" : "Red Team"}** (${stats.redTeam.score} ${isTr ? "gol" : "goals"})',
+      isTr
+          ? '**🔴 ${stats.redTeam.players.isNotEmpty ? stats.redTeam.players.first.split(' ').first : 'Red'} Team** — ${stats.redTeam.score} ${isTr ? 'gol' : 'goals'}'
+          : '**🔴 Red Team** — ${stats.redTeam.score} goals',
     );
     for (final g in redGoals) {
-      final assist = g.assist != null
-          ? ' ${isTr ? "Asist" : "Assist"} ${g.assist}'
+      final assistStr = g.assist != null
+          ? ' ${isTr ? 'Asist' : 'Assist'} **${g.assist}**'
           : '';
       buf.writeln(
-        '⚽ ${g.redScore}–${g.blueScore} ${g.scorer}$assist (${g.time})',
+        '⚽ ${g.redScore}–${g.blueScore} ${isTr ? 'Gol' : 'Goal'} **${g.scorer}**$assistStr  (${g.time})',
       );
     }
     buf.writeln();
     buf.writeln(
-      '🔵 **${isTr ? "Mavi Takım" : "Blue Team"}** (${stats.blueTeam.score} ${isTr ? "gol" : "goals"})',
+      isTr
+          ? '**🔵 ${stats.blueTeam.players.isNotEmpty ? stats.blueTeam.players.first.split(' ').first : 'Blue'} Team** — ${stats.blueTeam.score} ${isTr ? 'gol' : 'goals'}'
+          : '**🔵 Blue Team** — ${stats.blueTeam.score} goals',
     );
     for (final g in blueGoals) {
-      final assist = g.assist != null
-          ? ' ${isTr ? "Asist" : "Assist"} ${g.assist}'
+      final assistStr = g.assist != null
+          ? ' ${isTr ? 'Asist' : 'Assist'} **${g.assist}**'
           : '';
       buf.writeln(
-        '⚽ ${g.redScore}–${g.blueScore} ${g.scorer}$assist (${g.time})',
+        '⚽ ${g.redScore}–${g.blueScore} ${isTr ? 'Gol' : 'Goal'} **${g.scorer}**$assistStr  (${g.time})',
       );
     }
     return buf.toString().trim();

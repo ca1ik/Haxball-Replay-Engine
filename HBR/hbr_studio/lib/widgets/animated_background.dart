@@ -190,7 +190,7 @@ class _PhotoOverlayState extends State<_PhotoOverlay>
     return AnimatedBuilder(
       animation: _fade,
       builder: (_, __) => Opacity(
-        opacity: isDark ? 0.06 + _fade.value * 0.02 : 0.08 + _fade.value * 0.02,
+        opacity: isDark ? 0.12 + _fade.value * 0.04 : 0.14 + _fade.value * 0.04,
         child: Image.asset(
           _assetPath,
           fit: BoxFit.cover,

@@ -13,7 +13,7 @@ class AboutScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHeader(),
+        _buildHeader(context),
         const SizedBox(height: 24),
         Expanded(
           child: SingleChildScrollView(
@@ -47,7 +47,7 @@ class AboutScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() => Row(
+  Widget _buildHeader(BuildContext context) => Row(
     children: [
       Container(
         width: 40,
@@ -75,12 +75,17 @@ class AboutScreen extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: AppTheme.textPrim,
+              color: AppTheme.textPrimOf(context),
+              decoration: TextDecoration.none,
             ),
           ),
           Text(
             'HaxBall replay editor for the community',
-            style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSec),
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppTheme.textSecOf(context),
+              decoration: TextDecoration.none,
+            ),
           ),
         ],
       ),
@@ -556,8 +561,8 @@ class _FeatureCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: AppTheme.surface,
-              border: Border.all(color: AppTheme.border),
+              color: AppTheme.surfaceOf(context),
+              border: Border.all(color: AppTheme.borderOf(context)),
             ),
             child: Row(
               children: [
@@ -580,14 +585,16 @@ class _FeatureCard extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrim,
+                          color: AppTheme.textPrimOf(context),
+                          decoration: TextDecoration.none,
                         ),
                       ),
                       Text(
                         description,
                         style: GoogleFonts.inter(
                           fontSize: 10,
-                          color: AppTheme.textHint,
+                          color: AppTheme.textHintOf(context),
+                          decoration: TextDecoration.none,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

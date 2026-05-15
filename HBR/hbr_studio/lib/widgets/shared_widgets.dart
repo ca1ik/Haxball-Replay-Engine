@@ -26,11 +26,11 @@ class GlassCard extends StatelessWidget {
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
         borderRadius: br,
-        gradient: AppTheme.cardGrad,
+        gradient: AppTheme.cardGradOf(context),
         border: Border.all(
           color: highlighted
               ? AppTheme.accent.withOpacity(0.5)
-              : AppTheme.border,
+              : AppTheme.borderOf(context),
           width: highlighted ? 1.5 : 1,
         ),
         boxShadow: highlighted
@@ -159,7 +159,8 @@ class _GradientButtonState extends State<GradientButton> {
 
 class SectionLabel extends StatelessWidget {
   final String text;
-  const SectionLabel(this.text, {super.key});
+  final Color? color;
+  const SectionLabel(this.text, {super.key, this.color});
 
   @override
   Widget build(BuildContext context) => Text(
@@ -167,8 +168,9 @@ class SectionLabel extends StatelessWidget {
     style: GoogleFonts.inter(
       fontSize: 10,
       fontWeight: FontWeight.w600,
-      color: AppTheme.textHint,
+      color: color ?? AppTheme.textHintOf(context),
       letterSpacing: 1.2,
+      decoration: TextDecoration.none,
     ),
   );
 }
@@ -239,25 +241,30 @@ class InfoChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
-      color: AppTheme.surface,
+      color: AppTheme.surfaceOf(context),
       borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: AppTheme.border),
+      border: Border.all(color: AppTheme.borderOf(context)),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: AppTheme.textHint),
+        Icon(icon, size: 13, color: AppTheme.textHintOf(context)),
         const SizedBox(width: 6),
         Text(
           '$label  ',
-          style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textHint),
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            color: AppTheme.textHintOf(context),
+            decoration: TextDecoration.none,
+          ),
         ),
         Text(
           value,
           style: GoogleFonts.inter(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrim,
+            color: AppTheme.textPrimOf(context),
+            decoration: TextDecoration.none,
           ),
         ),
       ],

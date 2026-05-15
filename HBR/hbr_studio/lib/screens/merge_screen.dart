@@ -218,12 +218,17 @@ class _MergeScreenState extends State<MergeScreen> {
             style: GoogleFonts.inter(
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: AppTheme.textPrim,
+              color: AppTheme.textPrimOf(context),
+              decoration: TextDecoration.none,
             ),
           ),
           Text(
             'Combine multiple .hbr2 files into one continuous replay',
-            style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSec),
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppTheme.textSecOf(context),
+              decoration: TextDecoration.none,
+            ),
           ),
         ],
       ),
@@ -261,9 +266,9 @@ class _MergeScreenState extends State<MergeScreen> {
           borderRadius: BorderRadius.circular(16),
           color: _dragging
               ? AppTheme.accent.withOpacity(0.06)
-              : AppTheme.surface,
+              : AppTheme.surfaceOf(context),
           border: Border.all(
-            color: _dragging ? AppTheme.accent : AppTheme.border,
+            color: _dragging ? AppTheme.accent : AppTheme.borderOf(context),
             width: _dragging ? 2 : 1,
             strokeAlign: BorderSide.strokeAlignInside,
           ),
@@ -285,7 +290,10 @@ class _MergeScreenState extends State<MergeScreen> {
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: _dragging ? AppTheme.accent : AppTheme.textSec,
+                  color: _dragging
+                      ? AppTheme.accent
+                      : AppTheme.textSecOf(context),
+                  decoration: TextDecoration.none,
                 ),
               ),
               const SizedBox(height: 4),
@@ -293,7 +301,8 @@ class _MergeScreenState extends State<MergeScreen> {
                 'or click to browse',
                 style: GoogleFonts.inter(
                   fontSize: 11,
-                  color: AppTheme.textHint,
+                  color: AppTheme.textHintOf(context),
+                  decoration: TextDecoration.none,
                 ),
               ),
             ],
@@ -345,8 +354,8 @@ class _MergeScreenState extends State<MergeScreen> {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          gradient: AppTheme.cardGrad,
-          border: Border.all(color: AppTheme.border),
+          gradient: AppTheme.cardGradOf(context),
+          border: Border.all(color: AppTheme.borderOf(context)),
         ),
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(
@@ -376,7 +385,8 @@ class _MergeScreenState extends State<MergeScreen> {
             style: GoogleFonts.inter(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: AppTheme.textPrim,
+              color: AppTheme.textPrimOf(context),
+              decoration: TextDecoration.none,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -459,9 +469,9 @@ class _MergeScreenState extends State<MergeScreen> {
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: AppTheme.surface,
+            color: AppTheme.surfaceOf(context),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppTheme.border),
+            border: Border.all(color: AppTheme.borderOf(context)),
           ),
           child: Row(
             children: [
@@ -520,26 +530,7 @@ class _MergeScreenState extends State<MergeScreen> {
         child: SizedBox(
           height: 300,
           child: _logLines.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.terminal_rounded,
-                        size: 32,
-                        color: AppTheme.textHint,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Output will appear here',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppTheme.textHint,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+              ? _buildIdleInfo()
               : ListView.builder(
                   itemCount: _logLines.length,
                   itemBuilder: (_, i) => Padding(
@@ -563,6 +554,84 @@ class _MergeScreenState extends State<MergeScreen> {
       ],
     ],
   ).animate().fadeIn(duration: 500.ms, delay: 200.ms);
+
+  Widget _buildIdleInfo() {
+    final items = [
+      (
+        Icons.layers_rounded,
+        AppTheme.accent,
+        'How Merge Works',
+        'Each .hbr2 file is parsed via node-haxball Replay API. Frame events are offset so File 2 continues exactly after File 1 — no divergence.',
+      ),
+      (
+        Icons.sync_rounded,
+        AppTheme.purple,
+        'Spawn Order Preserved',
+        'Team rosters are re-applied in the exact room order. This ensures physics determinism — the simulation runs identically when replayed.',
+      ),
+      (
+        Icons.compress_rounded,
+        const Color(0xFF4A6CF7),
+        'Binary Compatible',
+        'Output is standard HBR2 format: magic header + version byte + zlib-deflated payload. Works in haxball.com viewer instantly.',
+      ),
+      (
+        Icons.sports_soccer_rounded,
+        const Color(0xFFFF8C42),
+        'Typical Use Case',
+        'Merge 1st half + 2nd half recordings from the same match. Or combine multiple games into one training review session.',
+      ),
+    ];
+    return ListView.separated(
+      padding: EdgeInsets.zero,
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, i) {
+        final item = items[i];
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: item.$2.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(item.$1, size: 14, color: item.$2),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.$3,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimOf(context),
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item.$4,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: AppTheme.textSecOf(context),
+                      height: 1.45,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Widget _buildProgressBar() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,

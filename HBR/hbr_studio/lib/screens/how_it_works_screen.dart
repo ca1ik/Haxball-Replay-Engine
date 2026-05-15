@@ -17,6 +17,8 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
   int _tab = 0;
   late final AnimationController _flowCtrl;
   bool _animating = false;
+  // Interactive split point (0.0–1.0), draggable after animation ends
+  double _splitRatio = 0.45;
 
   @override
   void initState() {
@@ -335,111 +337,238 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
     ),
   );
 
-  Widget _buildSplitTimeline() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const SectionLabel('Split at chosen point'),
-      const SizedBox(height: 10),
-      Container(
-        height: 36,
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Stack(
-            children: [
-              Row(
+  /// Convert a ratio (0.0–1.0) to "MM:SS" assuming a 90-minute typical match
+  String _ratioToTime(double ratio) {
+    final totalSec = (ratio * 90 * 60).round();
+    final m = totalSec ~/ 60;
+    final s = totalSec % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildSplitTimeline() {
+    final canDrag = !_animating;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            SectionLabel('Split at chosen point'),
+            const Spacer(),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.purple.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.purple.withOpacity(0.4)),
+                boxShadow: canDrag
+                    ? [
+                        BoxShadow(
+                          color: AppTheme.purple.withOpacity(0.25),
+                          blurRadius: 8,
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    flex: 45,
-                    child: Container(
-                      color: AppTheme.accent.withOpacity(0.2),
-                      child: Center(
-                        child: Text(
-                          'Part 1  →  output1.hbr2',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.accent,
-                          ),
-                        ),
-                      ),
-                    ),
+                  Icon(
+                    canDrag
+                        ? Icons.drag_indicator_rounded
+                        : Icons.lock_clock_rounded,
+                    size: 12,
+                    color: AppTheme.purple,
                   ),
-                  Expanded(
-                    flex: 55,
-                    child: Container(
-                      color: AppTheme.purple.withOpacity(0.2),
-                      child: Center(
-                        child: Text(
-                          'Part 2  →  output2.hbr2',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.purple,
-                          ),
-                        ),
-                      ),
+                  const SizedBox(width: 5),
+                  Text(
+                    canDrag ? '← drag to reposition →' : 'play animation first',
+                    style: GoogleFonts.inter(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.purple,
                     ),
                   ),
                 ],
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: 0.45,
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      width: 2,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.white.withOpacity(0.5),
-                            blurRadius: 6,
-                          ),
-                        ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final totalW = constraints.maxWidth;
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragUpdate: canDrag
+                  ? (d) => setState(() {
+                      _splitRatio =
+                          ((_splitRatio * totalW + d.delta.dx) / totalW).clamp(
+                            0.05,
+                            0.95,
+                          );
+                    })
+                  : null,
+              onTapDown: canDrag
+                  ? (d) => setState(() {
+                      _splitRatio = (d.localPosition.dx / totalW).clamp(
+                        0.05,
+                        0.95,
+                      );
+                    })
+                  : null,
+              child: MouseRegion(
+                cursor: canDrag
+                    ? SystemMouseCursors.resizeColumn
+                    : SystemMouseCursors.basic,
+                child: Stack(
+                  children: [
+                    // Timeline bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        height: 40,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: (_splitRatio * 1000).round(),
+                              child: Container(
+                                color: AppTheme.accent.withOpacity(0.2),
+                                child: Center(
+                                  child: Text(
+                                    'Part 1  →  output1.hbr2',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.accent,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: ((1 - _splitRatio) * 1000).round(),
+                              child: Container(
+                                color: AppTheme.purple.withOpacity(0.2),
+                                child: Center(
+                                  child: Text(
+                                    'Part 2  →  output2.hbr2',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.purple,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+                    // Draggable divider line
+                    Positioned(
+                      left: totalW * _splitRatio - 1,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 3,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.7),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Drag handle knob
+                    Positioned(
+                      left: totalW * _splitRatio - 8,
+                      top: 10,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: 16,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: canDrag ? Colors.white : Colors.white54,
+                          borderRadius: BorderRadius.circular(4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.purple.withOpacity(0.5),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.drag_indicator_rounded,
+                            size: 10,
+                            color: canDrag
+                                ? AppTheme.purple
+                                : AppTheme.textHint,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            );
+          },
         ),
-      ),
-      const SizedBox(height: 6),
-      Row(
-        children: [
-          Text(
-            '00:00',
-            style: GoogleFonts.inter(fontSize: 9, color: AppTheme.textHint),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppTheme.purple.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(4),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              '00:00',
+              style: GoogleFonts.inter(fontSize: 9, color: AppTheme.textHint),
             ),
-            child: Text(
-              'split point',
-              style: GoogleFonts.inter(fontSize: 9, color: AppTheme.purple),
+            const Spacer(),
+            // Time badge at split point
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppTheme.purple.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppTheme.purple.withOpacity(0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.content_cut_rounded,
+                    size: 9,
+                    color: AppTheme.purple,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _ratioToTime(_splitRatio),
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.purple,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Spacer(),
-          Text(
-            'end',
-            style: GoogleFonts.inter(fontSize: 9, color: AppTheme.textHint),
-          ),
-        ],
-      ),
-    ],
-  );
+            const Spacer(),
+            Text(
+              '90:00',
+              style: GoogleFonts.inter(fontSize: 9, color: AppTheme.textHint),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
   Widget _buildSplitSteps() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
