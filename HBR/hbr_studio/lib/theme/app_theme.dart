@@ -133,3 +133,13 @@ class AppTheme {
   static LinearGradient cardGradOf(BuildContext ctx) =>
       isDark(ctx) ? cardGrad : cardGradLight;
 }
+
+/// Responsive font-size helper. Scales linearly with window width beyond
+/// 1200 logical pixels (clamped 0.85×–1.75×). Usage: context.rfs(13)
+extension ResponsiveFontSize on BuildContext {
+  double rfs(double base) {
+    final w = MediaQuery.of(this).size.width;
+    final scale = (w / 1200.0).clamp(0.85, 1.75);
+    return base * scale;
+  }
+}

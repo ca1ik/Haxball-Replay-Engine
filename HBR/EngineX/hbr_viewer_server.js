@@ -25,6 +25,7 @@ const http    = require('http');
 const ws_mod  = require('ws');
 const fs      = require('fs');
 const path    = require('path');
+const { spawnSync } = require('child_process');
 
 const filePath = process.argv[2];
 if (!filePath) { origWrite('ERR:no file\n'); process.exit(1); }
@@ -163,6 +164,27 @@ wss.on('connection', (socket) => {
     } else if (cmd === 'speed') {
       speed = Math.max(0.25, Math.min(10, msg.v || 1));
       if (playing) startPlay(); // restart with new speed
+
+    } else if (cmd === 'saveClip') {
+      const { inFrame, outFrame, name } = msg;
+      if (typeof inFrame !== 'number' || typeof outFrame !== 'number' || outFrame <= inFrame) {
+        socket.send(JSON.stringify({ type: 'clipError', message: 'Invalid frame range.' }));
+        return;
+      }
+      const outName = (name || 'clip.hbr2').replace(/[^\w\-_.]/g, '_');
+      const outPath = path.join(path.dirname(filePath), outName);
+      const splitCli = path.join(__dirname, 'hbr_split_cli_new.js');
+      const result = spawnSync(process.execPath, [
+        splitCli, filePath, outPath,
+        String(Math.max(0, inFrame)), String(Math.min(totalFrames, outFrame)),
+        '--trim',
+      ], { encoding: 'utf8', timeout: 30000 });
+      if (result.status === 0) {
+        socket.send(JSON.stringify({ type: 'clipSaved', name: outName, path: outPath }));
+      } else {
+        const errMsg = (result.stdout || result.stderr || 'Unknown error').slice(0, 200);
+        socket.send(JSON.stringify({ type: 'clipError', message: errMsg }));
+      }
     }
   });
 
