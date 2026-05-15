@@ -1,0 +1,64 @@
+FILE1 totalFrames=44763 events=75213
+FILE2 totalFrames=41645 events=65136
+
+FILE2 initial room state players:
+  id=351 name=PASHAAA team=0
+  id=354 name=Demonic team=0
+  id=355 name=KVARA team=0
+  id=358 name=jrrzz7 team=0
+  id=359 name=Lozano bad team=0
+  id=363 name=ReinerV3 team=0
+  id=364 name=mamasita team=0
+  id=366 name=De Niro team=0
+  id=336 name=Verone team=1
+  id=340 name=Ölümcül. team=1
+  id=339 name=odrc team=1
+  id=337 name=Sung team=1
+  id=344 name=víl team=1
+  id=346 name=ryuji team=1
+  id=350 name=saikyo team=1
+  id=367 name=Demonic team=0
+  id=345 name=modric. team=0
+  id=368 name=Serra team=0
+  id=334 name=Emman64 team=2
+  id=343 name=jasko      team=2
+  id=333 name=^aMp^ team=2
+  id=356 name=xaro team=2
+  id=331 name=Nislija team=2
+  id=330 name=wnocy team=2
+  id=332 name=feffinho team=2
+
+FILE1 last event at frame: 44763
+FILE1 totalFrames: 44763
+
+FILE2 first 5 events:
+  frame=0 type=7 | D_=0, N$=0, X=356
+  frame=10 type=3 | D_=0, N$=0, C$=8, X=334
+  frame=10 type=3 | D_=0, N$=0, C$=10, X=334
+  frame=11 type=3 | D_=0, N$=0, C$=14, X=334
+  frame=12 type=3 | D_=0, N$=0, C$=0, X=330
+
+FILE1 initial room state players:
+  id=336 name=Verone team=2
+  id=340 name=Ölümcül. team=2
+  id=339 name=odrc team=2
+  id=337 name=Sung team=2
+  id=342 name=Venkinta team=0
+  id=344 name=víl team=2
+  id=346 name=ryuji team=2
+  id=349 name=Returnn team=0
+  id=350 name=saikyo team=2
+  id=351 name=PASHAAA team=0
+  id=353 name=Demonic team=0
+  id=354 name=Demonic team=0
+  id=355 name=KVARA team=0
+  id=357 name=Sylox team=0
+  id=332 name=feffinho team=0
+  id=334 name=Emman64 team=1
+  id=345 name=modric. team=1
+  id=333 name=^aMp^ team=1
+  id=356 name=xaro team=1
+  id=331 name=Nislija team=1
+  id=358 name=jrrzz7 team=0
+  id=330 name=wnocy team=1
+  id=343 name=jasko      team=1
