@@ -9,14 +9,19 @@ import '../models/match_stats.dart';
 class AnalyzerService {
   static String get _scriptDir =>
       Platform.environment['HBR_SCRIPT_DIR'] ??
-      p.join(
-        p.dirname(Platform.resolvedExecutable),
-        '..',
-        '..',
-        '..',
-        '..',
-        '..',
-        'HBR',
+      p.normalize(
+        p.join(
+          p.dirname(Platform.resolvedExecutable),
+          // exe: build/windows/x64/runner/Debug|Release/hbr_studio.exe
+          // 6 levels up  →  HBR workspace root  →  EngineX/
+          '..',
+          '..',
+          '..',
+          '..',
+          '..',
+          '..',
+          'EngineX',
+        ),
       );
 
   static String get _analyzeScript => p.join(_scriptDir, 'hbr_analyze_cli.js');

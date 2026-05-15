@@ -4,14 +4,23 @@ import 'package:path/path.dart' as p;
 
 /// NodeService: Calls Node.js CLI scripts and parses JSON progress lines.
 class NodeService {
-  // Path to the HBR folder (parent of the scripts)
+  // Resolves the EngineX/ directory from the built executable path.
+  // exe lives at: build/windows/x64/runner/Debug|Release/hbr_studio.exe
+  // Going 6 levels up reaches the HBR workspace root, then /EngineX contains scripts.
   static String get _scriptDir {
-    // In development the scripts are siblings of this Flutter project
-    // Debug/release: executable is deep inside build/windows/
-    // So we resolve relative to the script directory via an env var set at launch,
-    // or fallback to the hardcoded path next to the project folder.
     return Platform.environment['HBR_SCRIPT_DIR'] ??
-        p.normalize(p.join(p.dirname(Platform.script.toFilePath()), '..'));
+        p.normalize(
+          p.join(
+            p.dirname(Platform.resolvedExecutable),
+            '..',
+            '..',
+            '..',
+            '..',
+            '..',
+            '..',
+            'EngineX',
+          ),
+        );
   }
 
   /// Merge [filePaths] into [outputPath].

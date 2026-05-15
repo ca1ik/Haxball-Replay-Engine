@@ -292,24 +292,24 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
 
   static const _mergeSteps = [
     (
-      'Read both files',
-      'Each .hbr2 file is parsed using the node-haxball Replay API, extracting events, room state and goal markers.',
+      'Load your .hbr2 recordings',
+      'Drag & drop two or more .hbr2 files (e.g. 1st_half.hbr2 + 2nd_half.hbr2). The app reads each file using the node-haxball Replay API and extracts raw game events, room state, player roster and goal markers.',
     ),
     (
-      'Normalize team order',
-      'FILE1 team players are moved to spectator. FILE2 players are re-added in FILE2\'s exact room state order to preserve spawn positions.',
+      'Order & arrange',
+      'Drag files into the order they should play. File 1 comes first, File 2 continues from where File 1 ends. The frame counter ticks forward seamlessly — no gaps, no resets.',
     ),
     (
-      'Insert transition',
-      'A synthetic stopGame event is injected, followed by setPlayerTeam events at the boundary frame.',
+      'Normalize spawn order',
+      'haxball.com is deterministic: player spawn position dictates physics. The engine re-applies team assignments in File 2\'s exact room order so the simulation is identical when replayed.',
     ),
     (
-      'Offset & concat',
-      'FILE2 events are offset by FILE1.totalFrames+3 so they continue seamlessly after the halftime.',
+      'Offset & concat frames',
+      'File 2 event frame numbers are shifted by (File 1 total frames + 3). A synthetic stopGame + setPlayerTeam sequence is injected at the boundary so the viewer transitions cleanly.',
     ),
     (
-      'Write output',
-      'The merged replay object is serialized back to the HBR2 binary format (magic + version + deflate payload).',
+      'Write merged.hbr2',
+      'The merged replay is serialized to HBR2 binary format: 4-byte magic header, 1-byte version, zlib-deflated event payload. Fully compatible with haxball.com — open it in one click.',
     ),
   ];
 
@@ -589,24 +589,24 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
 
   static const _splitSteps = [
     (
-      'Read input file',
-      'The .hbr2 file is fully parsed to obtain all events with absolute frame numbers.',
+      'Load the recording',
+      'Drop a single .hbr2 file. The app probes the file with hbr_probe_cli.js to read total frame count and duration — no need to guess the match length.',
+    ),
+    (
+      'Set your split point',
+      'Use the MM:SS time fields or drag the purple divider on the interactive timeline. At 60 fps, entering "45:00" maps to frame 162,000 exactly.',
     ),
     (
       'Partition events',
-      'Events with frameNo ≤ splitFrame go to Part 1. Events with frameNo > splitFrame go to Part 2.',
+      'Events with frameNo ≤ splitFrame go into Part 1. Events with frameNo > splitFrame go into Part 2. No event is lost or duplicated.',
     ),
     (
       'Re-offset Part 2',
-      'Part 2 event frame numbers are shifted left by splitFrame so Part 2 starts at frame 0.',
+      'Part 2 frame numbers are shifted left by splitFrame so Part 2 starts at frame 0. The room state (stadium, teams, kick-off position) is copied verbatim from the original.',
     ),
     (
-      'Preserve room state',
-      'Both parts share the original room state (initial player/stadium config).',
-    ),
-    (
-      'Write two files',
-      'Part 1 and Part 2 are each serialized to independent .hbr2 binary files.',
+      'Download both parts',
+      'Two independent .hbr2 files are written. Part 1 and Part 2 can each be opened in haxball.com, re-merged, or split again for clip creation.',
     ),
   ];
 }

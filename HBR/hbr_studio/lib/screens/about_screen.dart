@@ -23,15 +23,15 @@ class AboutScreen extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(flex: 5, child: _buildAboutCard()),
+                    Expanded(flex: 5, child: _buildAboutCard(context)),
                     const SizedBox(width: 20),
                     Expanded(
                       flex: 3,
                       child: Column(
                         children: [
-                          _buildTechStack(),
+                          _buildTechStack(context),
                           const SizedBox(height: 20),
-                          _buildContact(),
+                          _buildContact(context),
                         ],
                       ),
                     ),
@@ -94,7 +94,7 @@ class AboutScreen extends StatelessWidget {
     ],
   ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1);
 
-  Widget _buildAboutCard() => GlassCard(
+  Widget _buildAboutCard(BuildContext context) => GlassCard(
     padding: const EdgeInsets.all(28),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,15 +131,17 @@ class AboutScreen extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrim,
+                    color: AppTheme.textPrimOf(context),
                     letterSpacing: -0.5,
+                    decoration: TextDecoration.none,
                   ),
                 ),
                 Text(
                   'HaxBall Replay Editor',
                   style: GoogleFonts.inter(
                     fontSize: 13,
-                    color: AppTheme.textSec,
+                    color: AppTheme.textSecOf(context),
+                    decoration: TextDecoration.none,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -155,14 +157,15 @@ class AboutScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
-        Container(height: 1, color: AppTheme.border),
+        Container(height: 1, color: AppTheme.borderOf(context)),
         const SizedBox(height: 24),
         Text(
           'What is HBR Studio?',
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrim,
+            color: AppTheme.textPrimOf(context),
+            decoration: TextDecoration.none,
           ),
         ),
         const SizedBox(height: 10),
@@ -173,8 +176,9 @@ class AboutScreen extends StatelessWidget {
           'or sharing specific moments with your community.',
           style: GoogleFonts.inter(
             fontSize: 13,
-            color: AppTheme.textSec,
+            color: AppTheme.textSecOf(context),
             height: 1.65,
+            decoration: TextDecoration.none,
           ),
         ),
         const SizedBox(height: 20),
@@ -183,7 +187,8 @@ class AboutScreen extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrim,
+            color: AppTheme.textPrimOf(context),
+            decoration: TextDecoration.none,
           ),
         ),
         const SizedBox(height: 12),
@@ -208,8 +213,9 @@ class AboutScreen extends StatelessWidget {
                     c,
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: AppTheme.textSec,
+                      color: AppTheme.textSecOf(context),
                       height: 1.5,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ),
@@ -239,8 +245,9 @@ class AboutScreen extends StatelessWidget {
                   '100% accurate physics and byte-identical replay serialization.',
                   style: GoogleFonts.inter(
                     fontSize: 11,
-                    color: AppTheme.textSec,
+                    color: AppTheme.textSecOf(context),
                     height: 1.5,
+                    decoration: TextDecoration.none,
                   ),
                 ),
               ),
@@ -251,7 +258,7 @@ class AboutScreen extends StatelessWidget {
     ),
   ).animate().fadeIn(duration: 500.ms, delay: 100.ms);
 
-  Widget _buildTechStack() => GlassCard(
+  Widget _buildTechStack(BuildContext context) => GlassCard(
     padding: const EdgeInsets.all(20),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,7 +268,7 @@ class AboutScreen extends StatelessWidget {
             Icon(
               Icons.developer_mode_rounded,
               size: 15,
-              color: AppTheme.textHint,
+              color: AppTheme.textHintOf(context),
             ),
             const SizedBox(width: 8),
             const SectionLabel('Tech Stack'),
@@ -287,6 +294,7 @@ class AboutScreen extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: t.$3,
+                        decoration: TextDecoration.none,
                       ),
                     ),
                   ),
@@ -301,14 +309,16 @@ class AboutScreen extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: AppTheme.textPrim,
+                          color: AppTheme.textPrimOf(context),
+                          decoration: TextDecoration.none,
                         ),
                       ),
                       Text(
                         t.$4,
                         style: GoogleFonts.inter(
                           fontSize: 10,
-                          color: AppTheme.textHint,
+                          color: AppTheme.textHintOf(context),
+                          decoration: TextDecoration.none,
                         ),
                       ),
                     ],
@@ -333,7 +343,7 @@ class AboutScreen extends StatelessWidget {
     ('Dart', 'Dart 3', Color(0xFF4A6CF7), 'App logic & state'),
   ];
 
-  Widget _buildContact() => GlassCard(
+  Widget _buildContact(BuildContext context) => GlassCard(
     padding: const EdgeInsets.all(20),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,7 +353,7 @@ class AboutScreen extends StatelessWidget {
             Icon(
               Icons.alternate_email_rounded,
               size: 15,
-              color: AppTheme.textHint,
+              color: AppTheme.textHintOf(context),
             ),
             const SizedBox(width: 8),
             const SectionLabel('Contact & Links'),
@@ -361,9 +371,9 @@ class AboutScreen extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: AppTheme.surface,
+                  color: AppTheme.surfaceOf(context),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.border),
+                  border: Border.all(color: AppTheme.borderOf(context)),
                 ),
                 child: Row(
                   children: [
@@ -378,14 +388,16 @@ class AboutScreen extends StatelessWidget {
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: AppTheme.textPrim,
+                              color: AppTheme.textPrimOf(context),
+                              decoration: TextDecoration.none,
                             ),
                           ),
                           Text(
                             c.$3,
                             style: GoogleFonts.inter(
                               fontSize: 10,
-                              color: AppTheme.textHint,
+                              color: AppTheme.textHintOf(context),
+                              decoration: TextDecoration.none,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -396,7 +408,7 @@ class AboutScreen extends StatelessWidget {
                     Icon(
                       Icons.open_in_new_rounded,
                       size: 12,
-                      color: AppTheme.textHint,
+                      color: AppTheme.textHintOf(context),
                     ),
                   ],
                 ),
@@ -416,8 +428,9 @@ class AboutScreen extends StatelessWidget {
             'Found a bug or have a feature request? Open an issue on GitHub or reach out on Discord.',
             style: GoogleFonts.inter(
               fontSize: 11,
-              color: AppTheme.textSec,
+              color: AppTheme.textSecOf(context),
               height: 1.5,
+              decoration: TextDecoration.none,
             ),
             textAlign: TextAlign.center,
           ),
