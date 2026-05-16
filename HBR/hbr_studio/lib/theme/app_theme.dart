@@ -4,10 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // ── Dark Palette ─────────────────────────────────────────────────────────────
-  static const Color bg = Color(0xFF080B14);
-  static const Color surface = Color(0xFF0F1524);
-  static const Color card = Color(0xFF141929);
-  static const Color border = Color(0xFF1E2740);
+  static const Color bg = Color(0xFF090C1A);
+  static const Color surface = Color(0xFF0C1020);
+  static const Color card = Color(0xFF101428);
+  static const Color border = Color(0xFF1B2238);
   static const Color accent = Color(0xFF00D4AA);
   static const Color accentDim = Color(0xFF00A882);
   static const Color purple = Color(0xFF7B5EA7);

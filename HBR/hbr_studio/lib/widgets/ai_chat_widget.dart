@@ -19,7 +19,10 @@ import '../providers/settings_provider.dart';
 import '../theme/app_theme.dart';
 
 class AiChatWidget extends StatefulWidget {
-  const AiChatWidget({super.key});
+  /// Extra bottom offset for the FAB so it clears any bottom panel.
+  /// Defaults to 20 (no panel). Pass panel_height + 20 + fab_size + gap when needed.
+  final double bottomOffset;
+  const AiChatWidget({super.key, this.bottomOffset = 20.0});
   @override
   State<AiChatWidget> createState() => _AiChatWidgetState();
 }
@@ -353,14 +356,13 @@ class _AiChatWidgetState extends State<AiChatWidget>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    // FAB is always centered at the bottom — no dragging
     const fabW = 52.0;
-    const fabMarginBottom = 20.0;
+    final fabMarginBottom = widget.bottomOffset;
     final fabLeft = (size.width - fabW) / 2;
 
     // Panel opens above the FAB, centered
     final panelLeft = ((size.width - 380) / 2).clamp(8.0, size.width - 388);
-    const panelBottom = fabMarginBottom + fabW + 16;
+    final panelBottom = fabMarginBottom + fabW + 16;
 
     return Stack(
       children: [
@@ -369,20 +371,28 @@ class _AiChatWidgetState extends State<AiChatWidget>
           Positioned(
             left: panelLeft,
             bottom: panelBottom,
-            child: Material(
-              color: Colors.transparent,
-              child: _ChatPanel(
-                messages: _messages,
-                typing: _typing,
-                ctrl: _ctrl,
-                scroll: _scroll,
-                onSend: _send,
-                onClear: () => setState(() {
-                  _messages.clear();
-                  _addGreeting();
-                }),
-              ),
-            ).animate().slideY(begin: 0.1).fadeIn(duration: 250.ms),
+            child:
+                Material(
+                      color: Colors.transparent,
+                      child: _ChatPanel(
+                        messages: _messages,
+                        typing: _typing,
+                        ctrl: _ctrl,
+                        scroll: _scroll,
+                        onSend: _send,
+                        onClear: () => setState(() {
+                          _messages.clear();
+                          _addGreeting();
+                        }),
+                      ),
+                    )
+                    .animate()
+                    .slideY(
+                      begin: 0.08,
+                      duration: 300.ms,
+                      curve: Curves.easeOutCubic,
+                    )
+                    .fadeIn(duration: 250.ms),
           ),
         // ── FAB (fixed bottom center) ─────────────────────────────────────────────
         Positioned(
@@ -603,90 +613,97 @@ class _MessageBubble extends StatelessWidget {
     final isUser = msg.isUser;
     final isDark = AppTheme.isDark(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: isUser
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        children: [
-          if (!isUser) ...[
-            Container(
-              width: 28,
-              height: 28,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [AppTheme.purple, AppTheme.indigo],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: isUser
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
+            children: [
+              if (!isUser) ...[
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [AppTheme.purple, AppTheme.indigo],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 13,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              child: const Icon(
-                Icons.auto_awesome_rounded,
-                size: 13,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: GestureDetector(
-              onLongPress: () {
-                Clipboard.setData(ClipboardData(text: msg.content));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Copied!',
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: GestureDetector(
+                  onLongPress: () {
+                    Clipboard.setData(ClipboardData(text: msg.content));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Copied!',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                        duration: const Duration(seconds: 1),
+                        backgroundColor: AppTheme.accent.withOpacity(0.8),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isUser
+                          ? AppTheme.purple.withOpacity(isDark ? 0.25 : 0.12)
+                          : (isDark
+                                ? const Color(0xFF141929)
+                                : const Color(0xFFF5F5FA)),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(14),
+                        topRight: const Radius.circular(14),
+                        bottomLeft: Radius.circular(isUser ? 14 : 4),
+                        bottomRight: Radius.circular(isUser ? 4 : 14),
+                      ),
+                      border: Border.all(
+                        color: isUser
+                            ? AppTheme.purple.withOpacity(0.3)
+                            : AppTheme.borderOf(context),
+                      ),
+                    ),
+                    child: Text(
+                      msg.content,
                       style: GoogleFonts.inter(
                         fontSize: 12,
+                        height: 1.6,
+                        color: AppTheme.textPrimOf(context),
                         decoration: TextDecoration.none,
                       ),
                     ),
-                    duration: const Duration(seconds: 1),
-                    backgroundColor: AppTheme.accent.withOpacity(0.8),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: isUser
-                      ? AppTheme.purple.withOpacity(isDark ? 0.25 : 0.12)
-                      : (isDark
-                            ? const Color(0xFF141929)
-                            : const Color(0xFFF5F5FA)),
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(14),
-                    topRight: const Radius.circular(14),
-                    bottomLeft: Radius.circular(isUser ? 14 : 4),
-                    bottomRight: Radius.circular(isUser ? 4 : 14),
-                  ),
-                  border: Border.all(
-                    color: isUser
-                        ? AppTheme.purple.withOpacity(0.3)
-                        : AppTheme.borderOf(context),
-                  ),
-                ),
-                child: Text(
-                  msg.content,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    height: 1.6,
-                    color: AppTheme.textPrimOf(context),
-                    decoration: TextDecoration.none,
                   ),
                 ),
               ),
-            ),
+              if (isUser) const SizedBox(width: 4),
+            ],
           ),
-          if (isUser) const SizedBox(width: 4),
-        ],
-      ),
-    );
+        )
+        .animate(key: ValueKey(msg.timestamp))
+        .slideX(
+          begin: isUser ? 0.08 : -0.08,
+          duration: 230.ms,
+          curve: Curves.easeOutCubic,
+        )
+        .fadeIn(duration: 200.ms);
   }
 }
 

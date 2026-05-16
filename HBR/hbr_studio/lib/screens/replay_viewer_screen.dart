@@ -1,12 +1,11 @@
 // lib/screens/replay_viewer_screen.dart
 //
-// Embeds haxball.com's official replay player inside the app using WebView2.
-//
-// Bottom panel features:
-//   • Interactive timeline scrubber with IN/OUT clip markers + seek
-//   • Clip Creator  — ⬥ IN / ⬥ OUT / name / 📋 Copy
-//   • Split shortcut — copies frame info for HBR Studio › Split
-//   • Draggable 🤖 HBR Assistant chatbot
+// Full-screen WebView2 replay player with:
+//   • Interactive timeline scrubber with IN/OUT clip markers
+//   • Clip Creator — set IN, then OUT → auto-saves clip via NodeService.trim()
+//   • Clip save path from SettingsProvider (default: Downloads)
+//   • Close in-player menu/overlay button
+//   • Global AI Chat overlay (AiChatWidget) — FAB above bottom panel
 
 import 'dart:async';
 import 'dart:convert';
@@ -17,12 +16,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
 import 'package:webview_windows/webview_windows.dart';
 
+import '../providers/settings_provider.dart';
+import '../services/node_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ai_chat_widget.dart';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
 String _fmtSec(int sec) {
   final m = sec ~/ 60;
   final s = sec % 60;
@@ -37,14 +39,7 @@ int _parseSec(String t) {
   return 0;
 }
 
-class _Msg {
-  final String text;
-  final bool isUser;
-  _Msg(this.text, this.isUser);
-}
-
 // ── Screen ────────────────────────────────────────────────────────────────────
-
 class ReplayViewerScreen extends StatefulWidget {
   const ReplayViewerScreen({super.key, required this.filePath});
   final String filePath;
@@ -62,25 +57,11 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
   // timeline / clip
   int _curSec = 0;
   int _durSec = 0;
-  int _inSec = -1;
-  int _outSec = -1;
   bool _expanded = true;
+  bool _saving = false;
   final _nameCtrl = TextEditingController();
-
-  // chatbot
-  bool _chatOpen = false;
-  Offset _chatPos = Offset.zero;
-  bool _chatInited = false;
-  final _chatIn = TextEditingController();
-  final _chatScroll = ScrollController();
-  final List<_Msg> _msgs = [
-    _Msg(
-      'Hi! I\'m your HBR Assistant.\n'
-      'Try: help · stats · clip from 1:00 to 2:30\n'
-      'how to clip · seek 3:15 · clear',
-      false,
-    ),
-  ];
+  final _startCtrl = TextEditingController(text: '0:00');
+  final _endCtrl = TextEditingController(text: '0:00');
 
   // toast
   String? _toast;
@@ -91,9 +72,16 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
   String get _cs => _fmtSec(_curSec);
   String get _ds => _durSec > 0 ? _fmtSec(_durSec) : '--:--';
   double get _frac => _durSec > 0 ? (_curSec / _durSec).clamp(0.0, 1.0) : 0.0;
+  bool get _canSave {
+    final s = _parseSec(_startCtrl.text);
+    final e = _parseSec(_endCtrl.text);
+    return e > s && _durSec > 0;
+  }
+
+  // Panel height for AI FAB offset
+  static const double _panelH = 88.0;
 
   // ── lifecycle ─────────────────────────────────────────────────────────────
-
   @override
   void initState() {
     super.initState();
@@ -103,8 +91,8 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _chatIn.dispose();
-    _chatScroll.dispose();
+    _startCtrl.dispose();
+    _endCtrl.dispose();
     _toastTm?.cancel();
     _controller.dispose();
     _srv?.close(force: true);
@@ -116,7 +104,7 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
       final bytes = await File(widget.filePath).readAsBytes();
       if (bytes.length < 12) throw Exception('File too small for .hbr2');
       final magic = String.fromCharCodes(bytes.sublist(0, 4));
-      if (magic != 'HBR2') throw Exception('Bad magic: $magic');
+      if (magic != 'HBR2') throw Exception('Invalid file format: $magic');
       final version = ByteData.sublistView(
         bytes,
         4,
@@ -151,11 +139,11 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
   }
 
   // ── JS bridge ─────────────────────────────────────────────────────────────
-
   Future<void> _injectBridge() async {
     const js = r'''
 (function(){
   if(window.__hbrB)return; window.__hbrB=true;
+  try{var _s=document.createElement('style');_s.textContent='body>header,body>nav,.navbar,.nav-bar,nav:first-of-type,[class*="header"]:not(canvas):not(div>canvas~*){display:none!important}body{overflow:hidden!important;margin:0!important;background:#000!important}';(document.head||document.documentElement).appendChild(_s);}catch(_x){}
   var _lt='';
   setInterval(function(){
     try{
@@ -217,133 +205,95 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
     } catch (_) {}
   }
 
-  // ── clip actions ──────────────────────────────────────────────────────────
-
-  void _setIn() => setState(() => _inSec = _curSec);
-  void _setOut() => setState(() => _outSec = _curSec);
-
-  void _copy() {
-    if (_inSec < 0 || _outSec <= _inSec) {
-      _toast_('Set a valid IN before OUT', err: true);
-      return;
-    }
-    final name = _nameCtrl.text.trim().isEmpty ? 'clip' : _nameCtrl.text.trim();
-    Clipboard.setData(
-      ClipboardData(
-        text:
-            'HBR Clip: $name\n'
-            'IN:  ${_fmtSec(_inSec)}  (frame ~${_inSec * 60})\n'
-            'OUT: ${_fmtSec(_outSec)}  (frame ~${_outSec * 60})\n'
-            'Dur: ${_fmtSec(_outSec - _inSec)}\n'
-            '→ Open HBR Studio › Split to extract.',
-      ),
-    );
-    _toast_('Copied! Open HBR Studio › Split to trim.');
+  // ── Close in-player haxball menu ──────────────────────────────────────────
+  Future<void> _closeMenu() async {
+    try {
+      await _controller.executeScript(r'''
+(function(){
+  var esc={key:'Escape',keyCode:27,which:27,bubbles:true,cancelable:true};
+  var canvas=document.querySelector('canvas');
+  ['keydown','keyup'].forEach(function(t){
+    document.dispatchEvent(new KeyboardEvent(t,esc));
+    if(canvas)canvas.dispatchEvent(new KeyboardEvent(t,esc));
+  });
+  document.querySelectorAll('button,a,[role="button"]').forEach(function(el){
+    var t=(el.textContent||'').trim().toLowerCase();
+    if(['resume','close','ok','back','dismiss','cancel','devam','kapat'].indexOf(t)>=0)el.click();
+  });
+  if(canvas){
+    canvas.focus();
+    var r=canvas.getBoundingClientRect();
+    canvas.dispatchEvent(new MouseEvent('click',{clientX:r.left+r.width/2,clientY:r.top+r.height/2,bubbles:true}));
+  }
+})();
+''');
+    } catch (_) {}
   }
 
-  void _split() {
-    if (_inSec < 0) {
-      _toast_('Set IN point first', err: true);
-      return;
+  // ── Clip actions ──────────────────────────────────────────────────────────
+  Future<void> _saveClip() async {
+    if (_saving) return;
+    final startSec = _parseSec(_startCtrl.text);
+    final endSec = _parseSec(_endCtrl.text);
+    if (endSec <= startSec) return;
+
+    final settings = context.read<SettingsProvider>();
+    final savePath = settings.clipSavePath;
+    final raw = _nameCtrl.text.trim();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final name = raw.isEmpty
+        ? 'clip_$ts'
+        : raw.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+    final outputPath = p.join(savePath, '$name.hbr2');
+
+    // Ensure save directory exists
+    try {
+      final dir = Directory(savePath);
+      if (!await dir.exists()) await dir.create(recursive: true);
+    } catch (_) {}
+
+    setState(() => _saving = true);
+    _showToast('Saving clip…');
+
+    try {
+      bool hasError = false;
+      String? errMsg;
+      await for (final evt in NodeService.trim(
+        inputPath: widget.filePath,
+        outputPath: outputPath,
+        startFrame: startSec * 60,
+        endFrame: endSec * 60,
+      )) {
+        if (evt['type'] == 'error') {
+          hasError = true;
+          errMsg = evt['message'] as String?;
+        }
+      }
+      if (hasError) {
+        _showToast('Save failed: $errMsg', err: true);
+      } else {
+        _showToast('Saved: $name.hbr2  →  ${p.basename(savePath)}');
+      }
+    } catch (e) {
+      _showToast('Save failed: $e', err: true);
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    Clipboard.setData(
-      ClipboardData(
-        text:
-            'Split at: ${_fmtSec(_inSec)} (frame ~${_inSec * 60})\n'
-            'File: ${widget.filePath}',
-      ),
-    );
-    _toast_('Copied! Open HBR Studio › Split tab to trim at this point.');
   }
 
-  // ── toast ─────────────────────────────────────────────────────────────────
-
-  void _toast_(String msg, {bool err = false}) {
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  void _showToast(String msg, {bool err = false}) {
     _toastTm?.cancel();
     setState(() {
       _toast = msg;
       _toastErr = err;
     });
-    _toastTm = Timer(const Duration(milliseconds: 3400), () {
+    _toastTm = Timer(const Duration(milliseconds: 3800), () {
       if (mounted) setState(() => _toast = null);
     });
   }
 
-  // ── chatbot ───────────────────────────────────────────────────────────────
-
-  void _add(String t, {bool user = false}) {
-    setState(() => _msgs.add(_Msg(t, user)));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_chatScroll.hasClients) {
-        _chatScroll.animateTo(
-          _chatScroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  String _reply(String q) {
-    final lq = q.toLowerCase().trim();
-    if (lq == 'help') {
-      return 'Commands:\n'
-          '· stats — time & clip markers\n'
-          '· clip from M:SS to M:SS — set markers\n'
-          '· current time\n'
-          '· how to clip\n'
-          '· seek M:SS — jump to time\n'
-          '· clear — reset IN/OUT';
-    }
-    if (lq == 'stats') {
-      return 'Time: $_cs / $_ds\n'
-          'IN:  ${_inSec >= 0 ? _fmtSec(_inSec) : "not set"}\n'
-          'OUT: ${_outSec >= 0 ? _fmtSec(_outSec) : "not set"}';
-    }
-    if (lq == 'current time') return 'Current time: $_cs';
-    if (lq == 'clear') {
-      setState(() {
-        _inSec = _outSec = -1;
-      });
-      return 'Clip markers cleared.';
-    }
-    if (lq == 'how to clip') {
-      return '1. Play to clip start\n'
-          '2. Tap ⬥ IN in the bottom bar\n'
-          '3. Play to clip end\n'
-          '4. Tap ⬥ OUT\n'
-          '5. Name it → 📋 Copy\n'
-          '6. Open HBR Studio › Split to trim';
-    }
-    final cm = RegExp(r'clip from (\d+:\d+)\s+to\s+(\d+:\d+)').firstMatch(lq);
-    if (cm != null) {
-      setState(() {
-        _inSec = _parseSec(cm.group(1)!);
-        _outSec = _parseSec(cm.group(2)!);
-      });
-      return 'Clip set: ${cm.group(1)} → ${cm.group(2)}\nTap 📋 Copy.';
-    }
-    final sm = RegExp(r'seek (\d+:\d+)').firstMatch(lq);
-    if (sm != null) {
-      _seekTo(_parseSec(sm.group(1)!));
-      return 'Seeking to ${sm.group(1)}…';
-    }
-    return 'I can help with clip timing and replay controls.\nType "help" for all commands.';
-  }
-
-  void _send() {
-    final v = _chatIn.text.trim();
-    if (v.isEmpty) return;
-    _add(v, user: true);
-    _chatIn.clear();
-    final r = _reply(v);
-    Future.delayed(const Duration(milliseconds: 160), () {
-      if (mounted) _add(r);
-    });
-  }
-
-  // ── file server ───────────────────────────────────────────────────────────
-
+  // ── File server ───────────────────────────────────────────────────────────
   void _serveFile(Uint8List bytes) {
     _srv!.listen((HttpRequest req) async {
       req.response.headers
@@ -364,69 +314,37 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
     });
   }
 
-  // ── build ─────────────────────────────────────────────────────────────────
-
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final sz = MediaQuery.of(context).size;
-    if (!_chatInited) {
-      _chatPos = Offset(16, sz.height - (_expanded ? 88 : 32) - 54);
-      _chatInited = true;
-    }
-
+    final panelBottom = (_expanded ? _panelH : 34.0) + 20.0 + 52.0 + 16.0;
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // WebView column (leaves room for panel at bottom)
+          // WebView + bottom panel (Column so WebView respects panel height)
           Column(
             children: [
               Expanded(child: _buildMain()),
               if (_ready) _buildPanel(),
             ],
           ),
-
-          // Close button (top-right, over WebView area)
+          // Close button (top-right)
           Positioned(
             top: 10,
             right: 10,
             child: _CloseBtn(onTap: () => Navigator.pop(context)),
           ),
-
-          // Chatbot panel (floats above the toggle)
-          if (_ready && _chatOpen)
-            Positioned(
-              left: _chatPos.dx.clamp(0, sz.width - 292),
-              top: (_chatPos.dy - 332 - 8).clamp(0, sz.height - 332),
-              child: _buildChatPanel(),
-            ),
-
-          // Chatbot toggle (draggable)
-          if (_ready)
-            Positioned(
-              left: _chatPos.dx.clamp(0, sz.width - 38),
-              top: _chatPos.dy.clamp(0, sz.height - 38),
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onPanUpdate: (d) => setState(() {
-                  _chatPos = Offset(
-                    (_chatPos.dx + d.delta.dx).clamp(0, sz.width - 38),
-                    (_chatPos.dy + d.delta.dy).clamp(0, sz.height - 38),
-                  );
-                }),
-                onTap: () => setState(() => _chatOpen = !_chatOpen),
-                child: _ChatToggle(open: _chatOpen),
-              ),
-            ),
-
-          // Toast
+          // Toast notification
           if (_toast != null)
             Positioned(
-              bottom: _expanded ? 100.0 : 44.0,
+              bottom: (_expanded ? _panelH : 32.0) + 10,
               left: 0,
               right: 0,
-              child: _ToastBar(msg: _toast!, err: _toastErr),
+              child: _Toast(msg: _toast!, err: _toastErr),
             ),
+          // Global AI Chat — FAB above bottom panel
+          Positioned.fill(child: AiChatWidget(bottomOffset: panelBottom)),
         ],
       ),
     );
@@ -449,22 +367,17 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
   }
 
   // ── bottom panel ─────────────────────────────────────────────────────────
+  Widget _buildPanel() => AnimatedContainer(
+    duration: const Duration(milliseconds: 200),
+    height: _expanded ? _panelH : 34.0,
+    decoration: const BoxDecoration(
+      color: Color(0xF2080A14),
+      border: Border(top: BorderSide(color: Color(0x4D7B5EA7))),
+    ),
+    child: Column(children: [_buildTimeline(), if (_expanded) _buildClipRow()]),
+  );
 
-  Widget _buildPanel() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: _expanded ? 88.0 : 32.0,
-      decoration: const BoxDecoration(
-        color: Color(0xF2080A14),
-        border: Border(top: BorderSide(color: Color(0x4D7B5EA7))),
-      ),
-      child: Column(
-        children: [_buildTimeline(), if (_expanded) _buildClipRow()],
-      ),
-    );
-  }
-
-  // timeline row (always visible even when collapsed)
+  // timeline row
   Widget _buildTimeline() => SizedBox(
     height: 32,
     child: Padding(
@@ -488,11 +401,11 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
           Expanded(
             child: _TimelineBar(
               frac: _frac,
-              inFrac: _inSec >= 0 && _durSec > 0
-                  ? (_inSec / _durSec).clamp(0.0, 1.0)
+              inFrac: _durSec > 0 && _parseSec(_startCtrl.text) > 0
+                  ? (_parseSec(_startCtrl.text) / _durSec).clamp(0.0, 1.0)
                   : null,
-              outFrac: _outSec >= 0 && _durSec > 0
-                  ? (_outSec / _durSec).clamp(0.0, 1.0)
+              outFrac: _durSec > 0 && _parseSec(_endCtrl.text) > 0
+                  ? (_parseSec(_endCtrl.text) / _durSec).clamp(0.0, 1.0)
                   : null,
               onSeek: (f) {
                 if (_durSec > 0) _seekTo((_durSec * f).round());
@@ -513,7 +426,11 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
+          // Close in-player menu
+          _TinyBtn(label: '✕ Menu', onTap: _closeMenu),
+          const SizedBox(width: 4),
+          // Expand/collapse toggle
           GestureDetector(
             onTap: () => setState(() => _expanded = !_expanded),
             child: Icon(
@@ -529,26 +446,39 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
     ),
   );
 
-  // clip creator row (shown when expanded)
+  // clip creator row
   Widget _buildClipRow() => Expanded(
     child: Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       child: Row(
         children: [
-          _Btn(label: '⬥ IN', color: AppTheme.purple, onTap: _setIn),
-          const SizedBox(width: 4),
-          _TLabel(
-            text: _inSec >= 0 ? _fmtSec(_inSec) : '--:--',
+          // Start time
+          _Btn(
+            label: '⬥ Başlangıç',
             color: AppTheme.purple,
+            onTap: () => setState(() => _startCtrl.text = _cs),
           ),
-          const SizedBox(width: 10),
-          _Btn(label: '⬥ OUT', color: AppTheme.accent, onTap: _setOut),
           const SizedBox(width: 4),
-          _TLabel(
-            text: _outSec >= 0 ? _fmtSec(_outSec) : '--:--',
-            color: AppTheme.accent,
+          _TimeField(
+            controller: _startCtrl,
+            color: AppTheme.purple,
+            onChanged: () => setState(() {}),
           ),
           const SizedBox(width: 10),
+          // End time
+          _Btn(
+            label: '⬥ Bitiş',
+            color: AppTheme.accent,
+            onTap: () => setState(() => _endCtrl.text = _cs),
+          ),
+          const SizedBox(width: 4),
+          _TimeField(
+            controller: _endCtrl,
+            color: AppTheme.accent,
+            onChanged: () => setState(() {}),
+          ),
+          const SizedBox(width: 10),
+          // Clip name
           Expanded(
             flex: 2,
             child: SizedBox(
@@ -561,7 +491,7 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
                   decoration: TextDecoration.none,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'clip name…',
+                  hintText: 'clip adı…',
                   hintStyle: GoogleFonts.inter(
                     fontSize: 11,
                     color: const Color(0xFF374060),
@@ -587,150 +517,50 @@ class _ReplayViewerScreenState extends State<ReplayViewerScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 6),
-          _Btn(label: '📋 Copy', color: AppTheme.accent, onTap: _copy),
-          const SizedBox(width: 6),
-          Container(width: 1, height: 20, color: const Color(0x1AFFFFFF)),
-          const SizedBox(width: 6),
-          _Btn(
-            label: '✂ Split at IN',
-            color: const Color(0xFF4A6CF7),
-            onTap: _split,
-          ),
-        ],
-      ),
-    ),
-  );
-
-  // ── chat panel ────────────────────────────────────────────────────────────
-
-  Widget _buildChatPanel() => Container(
-    width: 284,
-    height: 326,
-    decoration: BoxDecoration(
-      color: const Color(0xF4080A14),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0x667B5EA7)),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.5),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
-        ),
-      ],
-    ),
-    child: Column(
-      children: [
-        // header
-        Container(
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: Color(0x14FFFFFF))),
-          ),
-          child: Row(
-            children: [
-              const Text(
-                '🤖',
-                style: TextStyle(fontSize: 14, decoration: TextDecoration.none),
+          const SizedBox(width: 8),
+          // Kırp button
+          if (!_saving)
+            Opacity(
+              opacity: _canSave ? 1.0 : 0.38,
+              child: _Btn(
+                label: '✂ Kırp',
+                color: AppTheme.accent,
+                onTap: _saveClip,
               ),
-              const SizedBox(width: 8),
-              Text(
-                'HBR Assistant',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFFC8B4FF),
-                  decoration: TextDecoration.none,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // messages
-        Expanded(
-          child: ListView.builder(
-            controller: _chatScroll,
-            padding: const EdgeInsets.all(10),
-            itemCount: _msgs.length,
-            itemBuilder: (_, i) => _Bubble(msg: _msgs[i]),
-          ),
-        ),
-        // input
-        Container(
-          padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: Color(0x14FFFFFF))),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 30,
-                  child: TextField(
-                    controller: _chatIn,
-                    onSubmitted: (_) => _send(),
+            ),
+          if (_saving)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.accent,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Kaydediliyor…',
                     style: GoogleFonts.inter(
                       fontSize: 11,
-                      color: const Color(0xFFB0BCD8),
+                      color: AppTheme.accent,
                       decoration: TextDecoration.none,
                     ),
-                    decoration: InputDecoration(
-                      hintText: 'Ask anything…',
-                      hintStyle: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: const Color(0xFF374060),
-                        decoration: TextDecoration.none,
-                      ),
-                      filled: true,
-                      fillColor: const Color(0x14FFFFFF),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 0,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0x1AFFFFFF)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(
-                          color: AppTheme.purple.withOpacity(0.5),
-                        ),
-                      ),
-                    ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: _send,
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: const Color(0x4D7B5EA7),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0x807B5EA7)),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.send_rounded,
-                      size: 14,
-                      color: Color(0xFFC8B4FF),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+        ],
+      ),
     ),
   );
 }
 
 // ── Timeline Bar ──────────────────────────────────────────────────────────────
-
 class _TimelineBar extends StatelessWidget {
   const _TimelineBar({
     required this.frac,
@@ -776,7 +606,7 @@ class _TLPainter extends CustomPainter {
     final W = size.width;
     final cy = size.height / 2;
 
-    // track
+    // Track
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(0, cy - 2, W, 4),
@@ -784,7 +614,8 @@ class _TLPainter extends CustomPainter {
       ),
       Paint()..color = const Color(0x26FFFFFF),
     );
-    // clip region
+
+    // Clip region
     if (inFrac != null && outFrac != null && outFrac! > inFrac!) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
@@ -794,7 +625,8 @@ class _TLPainter extends CustomPainter {
         Paint()..color = const Color(0x5500C9A7),
       );
     }
-    // played (gradient)
+
+    // Progress
     final pX = (W * frac).clamp(0.0, W);
     if (pX > 0) {
       canvas.drawRRect(
@@ -808,16 +640,17 @@ class _TLPainter extends CustomPainter {
           ).createShader(Rect.fromLTWH(0, 0, W, 4)),
       );
     }
-    // playhead
+
+    // Playhead
     canvas.drawCircle(
       Offset(pX.clamp(4.0, W - 4.0), cy),
       5,
       Paint()..color = Colors.white,
     );
-    // IN marker
+
+    // Markers
     if (inFrac != null)
       _marker(canvas, W * inFrac!, cy, const Color(0xFF9D7FD4));
-    // OUT marker
     if (outFrac != null)
       _marker(canvas, W * outFrac!, cy, const Color(0xFF00C9A7));
   }
@@ -836,23 +669,44 @@ class _TLPainter extends CustomPainter {
       o.frac != frac || o.inFrac != inFrac || o.outFrac != outFrac;
 }
 
-// ── Small reusable widgets ────────────────────────────────────────────────────
-
-class _TLabel extends StatelessWidget {
-  const _TLabel({required this.text, required this.color});
-  final String text;
+// ── Small widgets ─────────────────────────────────────────────────────────────
+class _TimeField extends StatelessWidget {
+  const _TimeField({
+    required this.controller,
+    required this.color,
+    this.onChanged,
+  });
+  final TextEditingController controller;
   final Color color;
+  final VoidCallback? onChanged;
+
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 36,
-    child: Text(
-      text,
+    width: 46,
+    height: 28,
+    child: TextField(
+      controller: controller,
+      onChanged: onChanged != null ? (_) => onChanged!() : null,
+      textAlign: TextAlign.center,
       style: GoogleFonts.inter(
         fontSize: 11,
         fontWeight: FontWeight.w600,
         color: color,
         decoration: TextDecoration.none,
         fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: color.withOpacity(0.08),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: color.withOpacity(0.35)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: color.withOpacity(0.65)),
+        ),
       ),
     ),
   );
@@ -897,72 +751,51 @@ class _BtnState extends State<_Btn> {
   );
 }
 
-class _ChatToggle extends StatelessWidget {
-  const _ChatToggle({required this.open});
-  final bool open;
+class _TinyBtn extends StatefulWidget {
+  const _TinyBtn({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => Container(
-    width: 38,
-    height: 38,
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFF7B5EA7), Color(0xFF4A6CF7)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      shape: BoxShape.circle,
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xFF7B5EA7).withOpacity(0.45),
-          blurRadius: 12,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Center(
-      child: Text(
-        open ? '✕' : '🤖',
-        style: const TextStyle(fontSize: 16, decoration: TextDecoration.none),
-      ),
-    ),
-  );
+  State<_TinyBtn> createState() => _TinyBtnState();
 }
 
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.msg});
-  final _Msg msg;
+class _TinyBtnState extends State<_TinyBtn> {
+  bool _h = false;
   @override
-  Widget build(BuildContext context) => Align(
-    alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
-    child: Container(
-      constraints: const BoxConstraints(maxWidth: 220),
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: msg.isUser ? const Color(0x2E4A6CF7) : const Color(0x287B5EA7),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        msg.text,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          color: msg.isUser ? const Color(0xFFA0B0E0) : const Color(0xFFB8C8E0),
-          height: 1.45,
-          decoration: TextDecoration.none,
+  Widget build(BuildContext context) => MouseRegion(
+    onEnter: (_) => setState(() => _h = true),
+    onExit: (_) => setState(() => _h = false),
+    child: GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: _h ? Colors.white.withOpacity(0.08) : const Color(0x0AFFFFFF),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: const Color(0x14FFFFFF)),
+        ),
+        child: Text(
+          widget.label,
+          style: GoogleFonts.inter(
+            fontSize: 9,
+            color: _h ? Colors.white54 : Colors.white30,
+            decoration: TextDecoration.none,
+          ),
         ),
       ),
     ),
   );
 }
 
-class _ToastBar extends StatelessWidget {
-  const _ToastBar({required this.msg, required this.err});
+class _Toast extends StatelessWidget {
+  const _Toast({required this.msg, required this.err});
   final String msg;
   final bool err;
   @override
   Widget build(BuildContext context) => Center(
     child: Container(
-      constraints: const BoxConstraints(maxWidth: 360),
+      constraints: const BoxConstraints(maxWidth: 400),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
       decoration: BoxDecoration(
         color: err ? const Color(0x26FF4D6A) : const Color(0x2200C9A7),
@@ -983,8 +816,6 @@ class _ToastBar extends StatelessWidget {
     ),
   );
 }
-
-// ── Close / Loading / Error (unchanged API) ───────────────────────────────────
 
 class _CloseBtn extends StatefulWidget {
   const _CloseBtn({required this.onTap});
@@ -1068,7 +899,7 @@ class _ErrorView extends StatelessWidget {
       width: 380,
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: const Color(0xFF1a1a2e),
+        color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.red.withOpacity(0.4)),
       ),

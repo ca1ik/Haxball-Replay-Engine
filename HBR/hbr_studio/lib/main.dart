@@ -176,6 +176,10 @@ class _AppShellState extends State<AppShell> {
                   ],
                 ),
               ),
+              _BottomBar(
+                current: _current,
+                onSelect: (n) => setState(() => _current = n),
+              ),
             ],
           ),
           // ── Floating AI Chat ─────────────────────────────────────────────────
@@ -403,11 +407,11 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 88,
+    width: 80,
     decoration: BoxDecoration(
-      color: AppTheme.surfaceOf(context).withOpacity(0.7),
+      color: AppTheme.bgOf(context),
       border: Border(
-        right: BorderSide(color: AppTheme.borderOf(context).withOpacity(0.5)),
+        right: BorderSide(color: AppTheme.borderOf(context).withOpacity(0.6)),
       ),
     ),
     child: Column(
@@ -610,16 +614,32 @@ class _NavBtnState extends State<_NavBtn> with TickerProviderStateMixin {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            width: 72,
+            width: 64,
             height: 62,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
+              gradient: active
+                  ? LinearGradient(
+                      colors: [c.withOpacity(0.28), c.withOpacity(0.06)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
               color: active
-                  ? c.withOpacity(0.12)
+                  ? null
                   : (_hovered
                         ? AppTheme.borderOf(context).withOpacity(0.4)
                         : Colors.transparent),
-              border: active ? Border.all(color: c.withOpacity(0.25)) : null,
+              border: active ? Border.all(color: c.withOpacity(0.35)) : null,
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: c.withOpacity(0.22),
+                        blurRadius: 18,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
@@ -693,4 +713,137 @@ class _ParticlePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ParticlePainter old) => true;
+}
+
+// ── Bottom Bar ────────────────────────────────────────────────────────────────
+class _BottomBar extends StatelessWidget {
+  final NavItem current;
+  final ValueChanged<NavItem> onSelect;
+  const _BottomBar({required this.current, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final rp = context.watch<ReplayProvider>();
+    final isDark = AppTheme.isDark(context);
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.bgOf(context) : const Color(0xFFF0F2F8),
+        border: Border(
+          top: BorderSide(color: AppTheme.borderOf(context).withOpacity(0.6)),
+        ),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          const GlowDot(),
+          const SizedBox(width: 7),
+          Text(
+            'HBR Studio',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecOf(context),
+              decoration: TextDecoration.none,
+            ),
+          ),
+          if (rp.hasStats) ...[
+            Container(
+              width: 1,
+              height: 14,
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              color: AppTheme.borderOf(context),
+            ),
+            const Icon(
+              Icons.videocam_rounded,
+              size: 12,
+              color: AppTheme.accent,
+            ),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                rp.stats!.fileName,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: AppTheme.textSecOf(context),
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ),
+          ],
+          const Spacer(),
+          for (final item in [NavItem.analyze, NavItem.merge, NavItem.split])
+            _BottomBtn(
+              item: item,
+              active: current == item,
+              onTap: () => onSelect(item),
+            ),
+          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomBtn extends StatefulWidget {
+  final NavItem item;
+  final bool active;
+  final VoidCallback onTap;
+  const _BottomBtn({
+    required this.item,
+    required this.active,
+    required this.onTap,
+  });
+  @override
+  State<_BottomBtn> createState() => _BottomBtnState();
+}
+
+class _BottomBtnState extends State<_BottomBtn> {
+  bool _h = false;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context.read<SettingsProvider>().lang);
+    final c = widget.item.color;
+    final active = widget.active;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _h = true),
+      onExit: (_) => setState(() => _h = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: active
+                ? c.withOpacity(0.15)
+                : (_h ? Colors.white.withOpacity(0.04) : Colors.transparent),
+            border: active ? Border.all(color: c.withOpacity(0.3)) : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                widget.item.icon,
+                size: 13,
+                color: active ? c : AppTheme.textHintOf(context),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                widget.item.label(l10n),
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: active ? c : AppTheme.textHintOf(context),
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

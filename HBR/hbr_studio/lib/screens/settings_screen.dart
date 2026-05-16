@@ -1,5 +1,6 @@
 // lib/screens/settings_screen.dart
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -94,9 +95,13 @@ class SettingsScreen extends StatelessWidget {
                       l10n: l10n,
                     ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
                     const SizedBox(height: 16),
+                    _ClipOutputCard(
+                      settings: settings,
+                    ).animate().fadeIn(duration: 500.ms, delay: 250.ms),
+                    const SizedBox(height: 16),
                     _AboutMiniCard().animate().fadeIn(
                       duration: 500.ms,
-                      delay: 250.ms,
+                      delay: 300.ms,
                     ),
                   ],
                 ),
@@ -470,6 +475,134 @@ class _AboutRow extends StatelessWidget {
             color: AppTheme.textPrimOf(context),
             decoration: TextDecoration.none,
           ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ── Clip Output Path ───────────────────────────────────────────────────────────
+class _ClipOutputCard extends StatelessWidget {
+  final SettingsProvider settings;
+  const _ClipOutputCard({required this.settings});
+
+  Future<void> _browse(BuildContext context) async {
+    final result = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Choose Clip Save Folder',
+    );
+    if (result != null && context.mounted) {
+      context.read<SettingsProvider>().setClipSavePath(result);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => GlassCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.folder_rounded,
+              size: 15,
+              color: AppTheme.textHintOf(context),
+            ),
+            const SizedBox(width: 8),
+            SectionLabel('Clip Save Location'),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppTheme.borderOf(context).withOpacity(0.3),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppTheme.borderOf(context).withOpacity(0.5),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.folder_open_rounded, size: 14, color: AppTheme.accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  settings.clipSavePath,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.robotoMono(
+                    fontSize: 11,
+                    color: AppTheme.textSecOf(context),
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _browse(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppTheme.purple, AppTheme.indigo],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.folder_open_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Browse',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => context.read<SettingsProvider>().setClipSavePath(''),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppTheme.borderOf(context).withOpacity(0.5),
+                  ),
+                ),
+                child: Text(
+                  'Reset',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: AppTheme.textSecOf(context),
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     ),
